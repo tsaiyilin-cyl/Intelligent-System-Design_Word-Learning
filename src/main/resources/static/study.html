@@ -916,7 +916,7 @@
                             🗑️ 删除
                         </button>
                     ` : ''}
-                    <button class="action-btn btn-detail" onclick="showDetail('${word.wordId}')">
+                    <button class="action-btn btn-detail" onclick="showDetail('${word.wordId}', currentUserForStudy?.userId)">
                         📖 详情
                     </button>
                 </div>
@@ -1366,9 +1366,10 @@
     }
 
     // 显示单词详情
-    async function showDetail(wordId) {
+    async function showDetail(wordId, userId) {
         try {
-            const response = await fetch(`/api/words/get?wordId=${wordId}`);
+            const url = userId ? `/api/words/get?wordId=${wordId}&userId=${userId}` : `/api/words/get?wordId=${wordId}`;
+            const response = await fetch(url);
             const result = await response.json();
 
             if (result.code === 200 && result.data) {

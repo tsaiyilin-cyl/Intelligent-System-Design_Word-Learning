@@ -2,7 +2,9 @@ package cn.edu.cuc.class10.controller;
 
 import cn.edu.cuc.class10.entity.MistakeWord;
 import cn.edu.cuc.class10.entity.Word;
+import cn.edu.cuc.class10.entity.UserWordFamiliarity;
 import cn.edu.cuc.class10.repository.MistakeWordRepository;
+import cn.edu.cuc.class10.repository.UserWordFamiliarityRepository;
 import cn.edu.cuc.class10.repository.WordRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +21,9 @@ public class MistakeController {
 
     @Autowired
     private WordRepository wordRepository;
+
+    @Autowired
+    private UserWordFamiliarityRepository familiarityRepository;
 
     /**
      * 获取用户的生词本列表
@@ -114,6 +119,111 @@ public class MistakeController {
             
             result.put("code", 200);
             result.put("message", "已从生词本移除");
+        } catch (Exception e) {
+            result.put("code", 500);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
+
+    /**
+     * 获取生词本复习列表（含单词详情和用户熟悉度）
+     */
+    @GetMapping("/review/list")
+    public Map<String, Object> getReviewList(@RequestParam String userId) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            List<MistakeWord> mistakes = mistakeWordRepository.findByUserIdOrderByCreateTimeDesc(userId);
+            List<Map<String, Object>> data = new ArrayList<>();
+
+            for (MistakeWord mistake : mistakes) {
+                Map<String, Object> item = new HashMap<>();
+                item.put("recordId", mistake.getRecordId());
+                item.put("wordId", mistake.getWordId());
+
+                wordRepository.findById(mistake.getWordId()).ifPresent(word -> {
+                    item.put("content", word.getContent());
+                    item.put("translation", word.getTranslation());
+                    item.put("phonetic", word.getPhonetic());
+                    item.put("partOfSpeech", word.getPartOfSpeech());
+                });
+
+                // 获取用户对该词的熟悉度
+                int familiarity = familiarityRepository.findByUserIdAndWordId(userId, mistake.getWordId())
+                        .map(UserWordFamiliarity::getFamiliarity)
+                        .orElse(50);
+                item.put("familiarity", familiarity);
+
+                data.add(item);
+            }
+
+            result.put("code", 200);
+            result.put("data", data);
+        } catch (Exception e) {
+            result.put("code", 500);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
+
+    /**
+     * 复习时标记单词为"已认识"：移出生词本，熟悉度设为 max(当前, 70)
+     */
+    @PostMapping("/review/known")
+    public Map<String, Object> markKnown(@RequestBody Map<String, String> payload) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            String userId = payload.get("userId");
+            String wordId = payload.get("wordId");
+            if (userId == null || wordId == null) {
+                result.put("code", 400);
+                result.put("message", "参数缺失");
+                return result;
+            }
+
+            // 移出生词本
+            mistakeWordRepository.deleteByUserIdAndWordId(userId, wordId);
+
+            // 熟悉度设为 max(当前, 70)
+            UserWordFamiliarity uf = familiarityRepository.findByUserIdAndWordId(userId, wordId)
+                    .orElse(new UserWordFamiliarity(userId, wordId, 70, System.currentTimeMillis()));
+            int newFam = Math.max(uf.getFamiliarity(), 70);
+            uf.setFamiliarity(newFam);
+            uf.setLastUpdate(System.currentTimeMillis());
+            familiarityRepository.save(uf);
+
+            result.put("code", 200);
+            result.put("newFamiliarity", newFam);
+        } catch (Exception e) {
+            result.put("code", 500);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
+
+    /**
+     * 复习时标记单词为"不认识"：仅记录复习次数，留在生词本
+     */
+    @PostMapping("/review/unfamiliar")
+    public Map<String, Object> markUnfamiliar(@RequestBody Map<String, String> payload) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            String userId = payload.get("userId");
+            String wordId = payload.get("wordId");
+            if (userId == null || wordId == null) {
+                result.put("code", 400);
+                result.put("message", "参数缺失");
+                return result;
+            }
+
+            // 增加复习次数
+            mistakeWordRepository.findByUserIdAndWordId(userId, wordId).ifPresent(mw -> {
+                mw.setReviewCount(mw.getReviewCount() + 1);
+                mw.setLastReviewTime(System.currentTimeMillis());
+                mistakeWordRepository.save(mw);
+            });
+
+            result.put("code", 200);
         } catch (Exception e) {
             result.put("code", 500);
             result.put("message", e.getMessage());

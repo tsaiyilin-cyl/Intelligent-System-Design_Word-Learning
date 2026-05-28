@@ -29,9 +29,6 @@ public class Word {
     @Column(length = 20)
     private String phase;
 
-    @Column
-    private Integer familiarity = 0;
-
     @Column(length = 2000)
     private String similarMeanings;
 
@@ -57,7 +54,6 @@ public class Word {
         this.translation = translation;
         this.phonetic = phonetic;
         this.wordType = wordType;
-        this.familiarity = 50;
     }
 
     public Word(String content, String partOfSpeech, String translation,
@@ -68,7 +64,6 @@ public class Word {
         this.phonetic = phonetic;
         this.wordType = wordType;
         this.phase = phase;
-        this.familiarity = 50;
     }
 
     public String getWordId() {
@@ -125,14 +120,6 @@ public class Word {
 
     public void setPhase(String phase) {
         this.phase = phase;
-    }
-
-    public Integer getFamiliarity() {
-        return familiarity;
-    }
-
-    public void setFamiliarity(Integer familiarity) {
-        this.familiarity = familiarity;
     }
 
     public String getSimilarMeanings() {

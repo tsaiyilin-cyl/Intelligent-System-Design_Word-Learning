@@ -12,7 +12,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.PostConstruct;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -31,22 +30,6 @@ public class WordService {
     private UserWordFamiliarityRepository familiarityRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-
-    @PostConstruct
-    public void migrateDefaultFamiliarity() {
-        List<Word> words = wordRepository.findAll();
-        boolean changed = false;
-        for (Word word : words) {
-            if (word.getFamiliarity() != null && word.getFamiliarity() == 0) {
-                word.setFamiliarity(50);
-                wordRepository.save(word);
-                changed = true;
-            }
-        }
-        if (changed) {
-            System.out.println("Migrated word familiarity defaults: 0 -> 50");
-        }
-    }
 
     public Word addWord(String content, String partOfSpeech, String translation,
                         String phonetic, WordType wordType) {
@@ -146,17 +129,6 @@ public class WordService {
         return wordRepository.searchByKeyword(keyword);
     }
 
-    public void updateFamiliarity(String wordId, Integer familiarity) {
-        Word word = getWordById(wordId);
-
-        if (familiarity < 0 || familiarity > 100) {
-            throw new RuntimeException("熟悉度必须在 0-100 之间");
-        }
-
-        word.setFamiliarity(familiarity);
-        wordRepository.save(word);
-    }
-
     public void addSimilarMeaning(String wordId, String targetWordId, Double similarityScore) {
         Word word = getWordById(wordId);
 
@@ -226,45 +198,62 @@ public class WordService {
                 .filter(w -> w.getWordType() == WordType.CUSTOM)
                 .count();
 
-        double avgFamiliarity = allWords.stream()
-                .filter(w -> w.getFamiliarity() != null)
-                .mapToInt(Word::getFamiliarity)
-                .average()
-                .orElse(0.0);
-
         Map<String, Object> stats = new java.util.HashMap<>();
         stats.put("total", allWords.size());
         stats.put("syllabusCount", syllabusCount);
         stats.put("customCount", customCount);
-        stats.put("avgFamiliarity", Math.round(avgFamiliarity * 100.0) / 100.0);
 
         return stats;
     }
 
     /**
-     * 获取用户词汇域中熟悉度 <= 70 的单词
+     * 获取用户词汇域中熟悉度 <= 70 的单词（基于 UserWordFamiliarity，默认 50）
+     * 返回数据已包含该用户的熟悉度，避免 N+1 查询
      */
-    public List<Word> getLowFamiliarityWords(String userPhase, String filterType) {
+    public List<java.util.Map<String, Object>> getLowFamiliarityWords(String userId, String userPhase, String filterType) {
         List<Word> allWords = wordRepository.findAllOrderByContentAsc();
-        
+
+        // 加载该用户的所有熟悉度记录
+        java.util.Map<String, Integer> familiarityMap = familiarityRepository.findByUserId(userId)
+                .stream()
+                .collect(Collectors.toMap(
+                        UserWordFamiliarity::getWordId,
+                        UserWordFamiliarity::getFamiliarity,
+                        (v1, v2) -> v1
+                ));
+
         return allWords.stream()
                 .filter(word -> {
-                    // 过滤词汇域
                     if ("SYLLABUS".equals(filterType)) {
                         if (word.getWordType() != WordType.SYLLABUS) return false;
                         if (userPhase != null && !isInUserPhase(word.getPhase(), userPhase)) return false;
                     } else if ("CUSTOM".equals(filterType)) {
                         if (word.getWordType() != WordType.CUSTOM) return false;
-                    } else { // all
+                    } else {
                         if (word.getWordType() == WordType.SYLLABUS && userPhase != null) {
                             if (!isInUserPhase(word.getPhase(), userPhase)) return false;
                         } else if (word.getWordType() != WordType.CUSTOM && word.getWordType() != WordType.SYLLABUS) {
                             return false;
                         }
                     }
-                    // 过滤熟悉度
-                    Integer familiarity = word.getFamiliarity();
-                    return familiarity != null && familiarity <= 70;
+                    int familiarity = familiarityMap.getOrDefault(word.getWordId(), 50);
+                    return familiarity <= 70;
+                })
+                .map(word -> {
+                    java.util.Map<String, Object> item = new java.util.HashMap<>();
+                    item.put("wordId", word.getWordId());
+                    item.put("content", word.getContent());
+                    item.put("translation", word.getTranslation());
+                    item.put("partOfSpeech", word.getPartOfSpeech());
+                    item.put("phonetic", word.getPhonetic());
+                    item.put("wordType", word.getWordType());
+                    item.put("phase", word.getPhase());
+                    item.put("phrases", word.getPhrases());
+                    item.put("sentences", word.getSentences());
+                    item.put("similarMeanings", word.getSimilarMeanings());
+                    item.put("similarSpellings", word.getSimilarSpellings());
+                    item.put("familiarity", familiarityMap.getOrDefault(word.getWordId(), 50));
+                    return item;
                 })
                 .collect(Collectors.toList());
     }
@@ -283,34 +272,24 @@ public class WordService {
     }
 
     /**
-     * 更新单词熟悉度
+     * 更新用户对单词的熟悉度（写入 user_word_familiarity 表，按用户隔离）
      */
-    public void updateWordFamiliarity(String wordId, int newFamiliarity) {
-        Optional<Word> wordOpt = wordRepository.findById(wordId);
-        if (wordOpt.isEmpty()) {
-            throw new RuntimeException("单词不存在");
-        }
-        Word word = wordOpt.get();
-        word.setFamiliarity(newFamiliarity);
-        wordRepository.save(word);
+    public void updateWordFamiliarity(String wordId, int newFamiliarity, String userId) {
+        if (userId == null) return;
+        UserWordFamiliarity uf = familiarityRepository.findByUserIdAndWordId(userId, wordId)
+                .orElse(new UserWordFamiliarity(userId, wordId, newFamiliarity, System.currentTimeMillis()));
+        uf.setFamiliarity(newFamiliarity);
+        uf.setLastUpdate(System.currentTimeMillis());
+        familiarityRepository.save(uf);
     }
 
     /**
-     * 更新单词熟悉度（同步更新 words 表和 user_word_familiarity 表）
-     * 用于学习卡片操作，确保学习报告和测试系统能看到一致的数据
+     * 获取用户对单词的熟悉度（默认 50）
      */
-    public void updateWordFamiliarity(String wordId, int newFamiliarity, String userId) {
-        // 1. 更新 words 表
-        updateWordFamiliarity(wordId, newFamiliarity);
-
-        // 2. 同步更新 user_word_familiarity 表
-        if (userId != null) {
-            UserWordFamiliarity uf = familiarityRepository.findByUserIdAndWordId(userId, wordId)
-                    .orElse(new UserWordFamiliarity(userId, wordId, newFamiliarity, System.currentTimeMillis()));
-            uf.setFamiliarity(newFamiliarity);
-            uf.setLastUpdate(System.currentTimeMillis());
-            familiarityRepository.save(uf);
-        }
+    public int getUserFamiliarity(String userId, String wordId) {
+        return familiarityRepository.findByUserIdAndWordId(userId, wordId)
+                .map(UserWordFamiliarity::getFamiliarity)
+                .orElse(50);
     }
 
     /**

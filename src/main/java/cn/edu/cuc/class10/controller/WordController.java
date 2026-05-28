@@ -124,14 +124,32 @@ public class WordController {
     }
 
     @GetMapping("/get")
-    public Map<String, Object> getWord(@RequestParam String wordId) {
+    public Map<String, Object> getWord(
+            @RequestParam String wordId,
+            @RequestParam(required = false) String userId) {
         Map<String, Object> result = new HashMap<>();
 
         try {
             Word word = wordService.getWordById(wordId);
+            // 构建返回数据，包含用户隔离的熟悉度
+            Map<String, Object> data = new HashMap<>();
+            data.put("wordId", word.getWordId());
+            data.put("content", word.getContent());
+            data.put("translation", word.getTranslation());
+            data.put("partOfSpeech", word.getPartOfSpeech());
+            data.put("phonetic", word.getPhonetic());
+            data.put("wordType", word.getWordType());
+            data.put("phase", word.getPhase());
+            data.put("phrases", word.getPhrases());
+            data.put("sentences", word.getSentences());
+            data.put("similarMeanings", word.getSimilarMeanings());
+            data.put("similarSpellings", word.getSimilarSpellings());
+            data.put("familiarity",
+                    userId != null ? wordService.getUserFamiliarity(userId, wordId) : 50);
+
             result.put("code", 200);
             result.put("message", "查询成功");
-            result.put("data", word);
+            result.put("data", data);
         } catch (Exception e) {
             result.put("code", 404);
             result.put("message", e.getMessage());
@@ -204,24 +222,6 @@ public class WordController {
         return result;
     }
 
-    @GetMapping("/familiarity")
-    public Map<String, Object> updateFamiliarity(
-            @RequestParam String wordId,
-            @RequestParam Integer familiarity) {
-        Map<String, Object> result = new HashMap<>();
-
-        try {
-            wordService.updateFamiliarity(wordId, familiarity);
-            result.put("code", 200);
-            result.put("message", "更新成功");
-        } catch (Exception e) {
-            result.put("code", 400);
-            result.put("message", e.getMessage());
-        }
-
-        return result;
-    }
-
     @GetMapping("/statistics")
     public Map<String, Object> getStatistics() {
         Map<String, Object> result = new HashMap<>();
@@ -253,10 +253,10 @@ public class WordController {
             if (filterType == null || filterType.isEmpty()) {
                 filterType = "all";
             }
-            List<Word> words = wordService.getLowFamiliarityWords(userPhase, filterType);
+            List<Map<String, Object>> wordData = wordService.getLowFamiliarityWords(userId, userPhase, filterType);
             result.put("code", 200);
             result.put("message", "查询成功");
-            result.put("data", words);
+            result.put("data", wordData);
         } catch (Exception e) {
             result.put("code", 500);
             result.put("message", e.getMessage());
@@ -289,9 +289,8 @@ public class WordController {
                     newFamiliarity = 90;
                     break;
                 case "vague":
-                    // 获取当前熟悉度，改为80%
-                    Word currentWord = wordService.getWordById(wordId);
-                    int currentFam = currentWord.getFamiliarity() != null ? currentWord.getFamiliarity() : 50;
+                    // 获取当前用户对该词的熟悉度，改为80%
+                    int currentFam = wordService.getUserFamiliarity(userId, wordId);
                     newFamiliarity = (int) (currentFam * 0.8);
                     break;
                 case "unfamiliar":
@@ -307,7 +306,7 @@ public class WordController {
                     return result;
             }
 
-            // 更新熟悉度（同步写入 words 表和 user_word_familiarity 表）
+            // 更新熟悉度（写入 user_word_familiarity 表，按用户隔离）
             wordService.updateWordFamiliarity(wordId, newFamiliarity, userId);
 
             // 如果需要，添加到生词本

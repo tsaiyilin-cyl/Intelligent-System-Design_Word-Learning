@@ -103,6 +103,86 @@
             border-radius: 12px;
             text-align: center;
         }
+        .wordlist-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .wordlist-overlay.show { display: flex; }
+        .wordlist-modal {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            width: 90%;
+            max-width: 520px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .wordlist-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .wordlist-header h2 { color: #667eea; font-size: 20px; }
+        .wordlist-close {
+            background: #eee;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 14px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .wordlist-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .wordlist-tab {
+            padding: 6px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 20px;
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .wordlist-tab.active {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+        .wordlist-body {
+            flex: 1;
+            overflow-y: auto;
+        }
+        .wordlist-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #f5f5f5;
+        }
+        .wordlist-item:last-child { border-bottom: none; }
+        .wordlist-item-content { font-size: 16px; font-weight: bold; color: #333; }
+        .wordlist-item-trans { color: #888; font-size: 14px; margin-top: 2px; }
+        .wordlist-item-fam {
+            font-size: 13px;
+            padding: 3px 10px;
+            border-radius: 10px;
+            white-space: nowrap;
+        }
+        .wordlist-item-fam.high { background: #e8f5e9; color: #2e7d32; }
+        .wordlist-item-fam.low { background: #fce4ec; color: #c62828; }
+
         @media (max-width: 768px) {
             .stats-grid { grid-template-columns: 1fr; }
             .test-row { flex-direction: column; align-items: flex-start; gap: 8px; }
@@ -125,6 +205,24 @@
 
     <div id="content">
         <div class="loading">加载中...</div>
+    </div>
+</div>
+
+<!-- 单词列表弹窗 -->
+<div class="wordlist-overlay" id="wordlistOverlay">
+    <div class="wordlist-modal">
+        <div class="wordlist-header">
+            <h2 id="wordlistTitle">词汇列表</h2>
+            <button class="wordlist-close" onclick="closeWordList()">关闭</button>
+        </div>
+        <div class="wordlist-tabs" id="wordlistTabs">
+            <button class="wordlist-tab" onclick="switchWordList('all')">全部</button>
+            <button class="wordlist-tab" onclick="switchWordList('mastered')">已掌握</button>
+            <button class="wordlist-tab" onclick="switchWordList('unmastered')">未掌握</button>
+        </div>
+        <div class="wordlist-body" id="wordlistBody">
+            <div class="loading">加载中...</div>
+        </div>
     </div>
 </div>
 
@@ -174,8 +272,67 @@
             alert('无法查看该测试的详情：缺少会话标识');
             return;
         }
-        // 传递 fromPage 参数，让 report.html 知道从哪里来的
         window.location.href = `/report.html?sessionId=${sessionId}&fromPage=learning_report`;
+    }
+
+    // ---- 单词列表弹窗 ----
+    let currentWordListFilter = 'all';
+
+    async function showWordList(filter) {
+        currentWordListFilter = filter;
+        document.getElementById('wordlistOverlay').classList.add('show');
+        document.getElementById('wordlistTitle').textContent = filter === 'mastered' ? '已掌握词汇' : '词汇列表';
+        updateWordListTabs();
+        await loadWordList();
+    }
+
+    function updateWordListTabs() {
+        document.querySelectorAll('.wordlist-tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        const tabs = document.querySelectorAll('.wordlist-tab');
+        const filterMap = { 'all': 0, 'mastered': 1, 'unmastered': 2 };
+        const idx = filterMap[currentWordListFilter] || 0;
+        if (tabs[idx]) tabs[idx].classList.add('active');
+    }
+
+    async function switchWordList(filter) {
+        currentWordListFilter = filter;
+        document.getElementById('wordlistTitle').textContent = filter === 'mastered' ? '已掌握词汇' : '词汇列表';
+        updateWordListTabs();
+        document.getElementById('wordlistBody').innerHTML = '<div class="loading">加载中...</div>';
+        await loadWordList();
+    }
+
+    async function loadWordList() {
+        try {
+            const resp = await fetch(`/api/report/wordList?userId=${currentUser.userId}&filter=${currentWordListFilter}`);
+            const result = await resp.json();
+            if (result.code !== 200) {
+                document.getElementById('wordlistBody').innerHTML = `<div class="error-message">加载失败</div>`;
+                return;
+            }
+            const words = result.data || [];
+            if (words.length === 0) {
+                document.getElementById('wordlistBody').innerHTML = '<div style="text-align:center;padding:30px;color:#999;">暂无单词</div>';
+                return;
+            }
+            document.getElementById('wordlistBody').innerHTML = words.map(w => `
+                <div class="wordlist-item">
+                    <div>
+                        <div class="wordlist-item-content">${w.content}</div>
+                        <div class="wordlist-item-trans">${w.translation}</div>
+                    </div>
+                    <span class="wordlist-item-fam ${w.familiarity >= 70 ? 'high' : 'low'}">${Math.round(w.familiarity)}%</span>
+                </div>
+            `).join('');
+        } catch(e) {
+            document.getElementById('wordlistBody').innerHTML = '<div class="error-message">网络错误</div>';
+        }
+    }
+
+    function closeWordList() {
+        document.getElementById('wordlistOverlay').classList.remove('show');
     }
 
     function renderReport(data) {
@@ -184,11 +341,11 @@
         // 统计卡片
         const statsHtml = `
             <div class="stats-grid">
-                <div class="stat-item">
+                <div class="stat-item" onclick="showWordList('all')" style="cursor: pointer;">
                     <div class="stat-number">${data.totalWords}</div>
                     <div class="stat-label">总词汇量</div>
                 </div>
-                <div class="stat-item">
+                <div class="stat-item" onclick="showWordList('mastered')" style="cursor: pointer;">
                     <div class="stat-number">${data.masteredWords}</div>
                     <div class="stat-label">已掌握单词</div>
                 </div>

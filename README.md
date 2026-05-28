@@ -116,6 +116,7 @@ taskkill /F /PID xxx
   );
     ALTER TABLE words MODIFY COLUMN similar_meanings TEXT;
     ALTER TABLE words MODIFY COLUMN similar_spellings TEXT;
+    ALTER TABLE words DROP COLUMN familiarity;
 ```
 
 # 开发者事项

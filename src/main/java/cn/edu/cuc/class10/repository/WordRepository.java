@@ -26,16 +26,6 @@ public interface WordRepository extends JpaRepository<Word, String> {
     @Query("SELECT w FROM Word w WHERE w.partOfSpeech = :partOfSpeech")
     List<Word> findByPartOfSpeech(@Param("partOfSpeech") String partOfSpeech);
 
-    @Query("SELECT w FROM Word w WHERE w.familiarity >= :minFamiliarity AND w.familiarity <= :maxFamiliarity")
-    List<Word> findByFamiliarityBetween(@Param("minFamiliarity") Integer minFamiliarity,
-                                        @Param("maxFamiliarity") Integer maxFamiliarity);
-
-    @Query("SELECT w FROM Word w ORDER BY w.familiarity ASC")
-    List<Word> findAllOrderByFamiliarityAsc();
-
-    @Query("SELECT w FROM Word w ORDER BY w.familiarity DESC")
-    List<Word> findAllOrderByFamiliarityDesc();
-
     @Query("SELECT w FROM Word w WHERE w.wordType = :wordType ORDER BY w.content ASC")
     List<Word> findByWordTypeOrderByContent(@Param("wordType") WordType wordType);
 

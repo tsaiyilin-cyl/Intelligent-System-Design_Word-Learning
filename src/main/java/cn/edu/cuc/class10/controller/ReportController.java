@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -22,6 +23,26 @@ public class ReportController {
             DashboardDataResponse data = reportService.getDashboardData(userId);
             result.put("code", 200);
             result.put("data", data);
+        } catch (Exception e) {
+            result.put("code", 500);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
+
+    /**
+     * 获取单词列表（供报告详情查看）
+     * filter: all | mastered | unmastered
+     */
+    @GetMapping("/wordList")
+    public Map<String, Object> getWordList(
+            @RequestParam String userId,
+            @RequestParam(defaultValue = "all") String filter) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            List<Map<String, Object>> words = reportService.getWordList(userId, filter);
+            result.put("code", 200);
+            result.put("data", words);
         } catch (Exception e) {
             result.put("code", 500);
             result.put("message", e.getMessage());

@@ -31,7 +31,6 @@ public class SimilarityInitializer {
                 .anyMatch(w -> w.getSimilarSpellings() != null && !w.getSimilarSpellings().isEmpty());
         if (alreadyComputed) return;
 
-        System.out.println("Computing similar word groups for " + allWords.size() + " words...");
         long start = System.currentTimeMillis();
 
         Map<String, List<Map<String, Object>>> spellingsMap = computeSimilarSpellings(allWords);
@@ -70,7 +69,7 @@ public class SimilarityInitializer {
         }
 
         long elapsed = System.currentTimeMillis() - start;
-        System.out.println("Similarity computation done in " + elapsed + "ms, updated " + updated + " words");
+        System.out.println("[SimilarityInitializer] done (" + elapsed + "ms, updated " + updated + " words)");
     }
 
     /**

@@ -85,6 +85,117 @@
             color: #999;
         }
         .loading { text-align: center; padding: 40px; color: #666; }
+
+        /* 复习卡片弹窗 */
+        .review-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .review-overlay.show { display: flex; }
+        .review-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            width: 90%;
+            max-width: 480px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .review-progress {
+            color: #999;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .review-word {
+            font-size: 36px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .review-phonetic {
+            font-size: 18px;
+            color: #999;
+            margin-bottom: 20px;
+        }
+        .review-pos {
+            background: #f0f2ff;
+            color: #667eea;
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        .review-translation {
+            font-size: 24px;
+            color: #555;
+            margin-bottom: 10px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 10px;
+        }
+        .review-familiarity {
+            font-size: 14px;
+            color: #999;
+            margin-bottom: 30px;
+        }
+        .review-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+        .review-btn {
+            padding: 14px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1;
+            max-width: 180px;
+        }
+        .review-btn-known {
+            background: #4caf50;
+            color: white;
+        }
+        .review-btn-known:hover { background: #388e3c; }
+        .review-btn-unfamiliar {
+            background: #ff9800;
+            color: white;
+        }
+        .review-btn-unfamiliar:hover { background: #e68900; }
+        .review-btn-close {
+            background: #eee;
+            color: #666;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        .review-complete {
+            padding: 30px;
+        }
+        .review-complete h2 {
+            font-size: 28px;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        .review-complete p {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 25px;
+        }
     </style>
 </head>
 <body>
@@ -97,6 +208,7 @@
     <div class="stats-card">
         <div class="stats-number" id="totalCount">0</div>
         <div class="stats-label">生词总数</div>
+        <button class="action-btn btn-review" id="startReviewBtn" onclick="startReview()" style="margin-top: 12px; padding: 10px 30px; font-size: 16px; display: none;">开始复习</button>
     </div>
 
     <div class="words-list" id="wordsList">
@@ -104,9 +216,30 @@
     </div>
 </div>
 
+<!-- 复习卡片弹窗 -->
+<div class="review-overlay" id="reviewOverlay">
+    <div class="review-card" id="reviewContent">
+        <div class="review-progress" id="reviewProgress"></div>
+        <div class="review-word" id="reviewWord"></div>
+        <div class="review-phonetic" id="reviewPhonetic"></div>
+        <div class="review-pos" id="reviewPos"></div>
+        <div class="review-translation" id="reviewTranslation"></div>
+        <div class="review-familiarity" id="reviewFam"></div>
+        <div class="review-actions" id="reviewActions">
+            <button class="review-btn review-btn-known" onclick="reviewKnown()">✓ 认识</button>
+            <button class="review-btn review-btn-unfamiliar" onclick="reviewUnfamiliar()">✗ 不认识</button>
+        </div>
+    </div>
+</div>
+
 <script>
     let currentUser = null;
     let mistakeWords = [];
+    // 复习状态
+    let reviewList = [];
+    let reviewIndex = 0;
+    let reviewTotal = 0;
+    let reviewKnownCount = 0;
 
     window.onload = async () => {
         currentUser = getCurrentUser();
@@ -132,10 +265,11 @@
         try {
             const response = await fetch(`/api/mistake/list?userId=${currentUser.userId}`);
             const result = await response.json();
-            
+
             if (result.code === 200) {
                 mistakeWords = result.data || [];
                 document.getElementById('totalCount').textContent = mistakeWords.length;
+                document.getElementById('startReviewBtn').style.display = mistakeWords.length > 0 ? 'inline-block' : 'none';
                 renderMistakeWords();
             } else {
                 showError('加载失败：' + (result.message || '未知错误'));
@@ -148,11 +282,11 @@
 
     function renderMistakeWords() {
         const container = document.getElementById('wordsList');
-        
+
         if (mistakeWords.length === 0) {
             container.innerHTML = `
                 <div class="empty-state">
-                    <h3>🎉 太棒了！</h3>
+                    <h3>太棒了！</h3>
                     <p>你的生词本是空的，继续保持！</p>
                 </div>
             `;
@@ -160,24 +294,129 @@
         }
 
         container.innerHTML = mistakeWords.map(item => `
-            <div class="word-item">
+            <div class="word-item" id="wordRow_${item.wordId}">
                 <div class="word-info">
                     <div class="word-content">${item.word.content}</div>
                     <div class="word-translation">${item.word.translation}</div>
                 </div>
                 <div class="word-actions">
-                    <button class="action-btn btn-review" onclick="reviewWord('${item.wordId}')">复习</button>
+                    <button class="action-btn btn-review" onclick="startReview('${item.wordId}')">复习</button>
                     <button class="action-btn btn-remove" onclick="removeWord('${item.wordId}', '${item.word.content}')">移除</button>
                 </div>
             </div>
         `).join('');
     }
 
-    async function reviewWord(wordId) {
-        // 跳转到学习模式，复习这个单词
-        window.location.href = `/study.html?review=${wordId}`;
+    // ---- 复习卡片逻辑 ----
+    async function startReview(startWordId) {
+        // 加载生词本复习列表（含熟悉度）
+        try {
+            const resp = await fetch(`/api/mistake/review/list?userId=${currentUser.userId}`);
+            const result = await resp.json();
+            if (result.code !== 200) { alert('加载失败'); return; }
+            reviewList = result.data || [];
+        } catch(e) {
+            alert('网络错误');
+            return;
+        }
+
+        if (reviewList.length === 0) return;
+
+        // 如果指定了起始单词，从该单词开始
+        reviewIndex = startWordId ? reviewList.findIndex(w => w.wordId === startWordId) : 0;
+        if (reviewIndex < 0) reviewIndex = 0;
+        reviewTotal = reviewList.length;
+        reviewKnownCount = 0;
+
+        document.getElementById('reviewOverlay').classList.add('show');
+        showReviewCard();
     }
 
+    function showReviewCard() {
+        if (reviewIndex >= reviewTotal) {
+            showReviewComplete();
+            return;
+        }
+
+        const word = reviewList[reviewIndex];
+        document.getElementById('reviewProgress').textContent = `第 ${reviewIndex + 1} / ${reviewTotal} 个`;
+        document.getElementById('reviewWord').textContent = word.content;
+        document.getElementById('reviewPhonetic').textContent = word.phonetic || '';
+        document.getElementById('reviewPos').textContent = word.partOfSpeech || '';
+        document.getElementById('reviewPos').style.display = word.partOfSpeech ? 'inline-block' : 'none';
+        document.getElementById('reviewTranslation').textContent = word.translation;
+        document.getElementById('reviewFam').textContent = `当前熟悉度：${word.familiarity}%`;
+        document.getElementById('reviewActions').style.display = 'flex';
+    }
+
+    async function reviewKnown() {
+        const word = reviewList[reviewIndex];
+        try {
+            await fetch('/api/mistake/review/known', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: currentUser.userId, wordId: word.wordId })
+            });
+        } catch(e) {}
+
+        reviewKnownCount++;
+        // 从列表和页面上移除
+        const row = document.getElementById(`wordRow_${word.wordId}`);
+        if (row) row.remove();
+        reviewIndex++;
+        showReviewCard();
+    }
+
+    async function reviewUnfamiliar() {
+        const word = reviewList[reviewIndex];
+        try {
+            await fetch('/api/mistake/review/unfamiliar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: currentUser.userId, wordId: word.wordId })
+            });
+        } catch(e) {}
+
+        reviewIndex++;
+        showReviewCard();
+    }
+
+    function showReviewComplete() {
+        document.getElementById('reviewProgress').textContent = '';
+        document.getElementById('reviewWord').textContent = '';
+        document.getElementById('reviewPhonetic').textContent = '';
+        document.getElementById('reviewPos').textContent = '';
+        document.getElementById('reviewTranslation').textContent = '';
+        document.getElementById('reviewFam').textContent = '';
+        document.getElementById('reviewActions').style.display = 'none';
+        document.getElementById('reviewContent').innerHTML = `
+            <div class="review-complete">
+                <h2>复习完成！</h2>
+                <p>本次复习了 ${reviewTotal} 个生词，${reviewKnownCount} 个已掌握。</p>
+                <p>继续加油！</p>
+                <button class="review-btn-close" onclick="closeReview()">关闭</button>
+            </div>
+        `;
+    }
+
+    function closeReview() {
+        document.getElementById('reviewOverlay').classList.remove('show');
+        document.getElementById('reviewContent').innerHTML = `
+            <div class="review-progress" id="reviewProgress"></div>
+            <div class="review-word" id="reviewWord"></div>
+            <div class="review-phonetic" id="reviewPhonetic"></div>
+            <div class="review-pos" id="reviewPos"></div>
+            <div class="review-translation" id="reviewTranslation"></div>
+            <div class="review-familiarity" id="reviewFam"></div>
+            <div class="review-actions" id="reviewActions">
+                <button class="review-btn review-btn-known" onclick="reviewKnown()">认识</button>
+                <button class="review-btn review-btn-unfamiliar" onclick="reviewUnfamiliar()">不认识</button>
+            </div>
+        `;
+        loadMistakeWords();
+    }
+
+    // ---- 原有移除功能 ----
     async function removeWord(wordId, wordContent) {
         if (!confirm(`确定要从生词本中移除"${wordContent}"吗？`)) {
             return;
@@ -193,10 +432,22 @@
                 })
             });
             const result = await response.json();
-            
+
             if (result.code === 200) {
-                alert('已移除');
-                loadMistakeWords();
+                // 直接移除DOM元素，不重新加载
+                const row = document.getElementById(`wordRow_${wordId}`);
+                if (row) row.remove();
+                mistakeWords = mistakeWords.filter(w => w.wordId !== wordId);
+                document.getElementById('totalCount').textContent = mistakeWords.length;
+                if (mistakeWords.length === 0) {
+                    document.getElementById('startReviewBtn').style.display = 'none';
+                    document.getElementById('wordsList').innerHTML = `
+                        <div class="empty-state">
+                            <h3>太棒了！</h3>
+                            <p>你的生词本是空的，继续保持！</p>
+                        </div>
+                    `;
+                }
             } else {
                 alert('移除失败：' + (result.message || '未知错误'));
             }
@@ -209,7 +460,7 @@
     function showError(message) {
         document.getElementById('wordsList').innerHTML = `
             <div class="empty-state" style="color: #d32f2f;">
-                <h3>😵 加载失败</h3>
+                <h3>加载失败</h3>
                 <p>${message}</p>
             </div>
         `;

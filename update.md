@@ -307,6 +307,7 @@
 - **成员**: 蔡奕麟
 - **审查**: 蔡奕麟
 - **工作内容**:
+
   **相似词群自动计算**：
   - 新增 SimilarityInitializer，启动时自动计算所有单词的相似词义群和相似词样群
   - 相似词样群（similarSpellings）：按首字母分组 + 长度过滤，计算 Levenshtein 编辑距离 ≤2 的形似词
@@ -318,16 +319,45 @@
   - 中译英选择：干扰项优先从该词的相似词义群（近义词）的拼写中抽取
   - 相似词不够时回退到随机选取
 
-  **修复学习卡片操作与报告数据不同步的问题**：
-  - 学习卡片操作（熟悉/模糊/不熟悉/已掌握）现在同步写入 words 表和 user_word_familiarity 表
-  - 学习报告 dashboard 现可正确统计学习卡片产生的掌握数据
-
-  **修复未学单词默认熟悉度显示问题**：
-  - Word 构造函数默认熟悉度从 0 改为 50
-  - 启动时自动迁移数据库中现有 familiarity=0 的记录为 50
+  **熟悉度改为按用户彻底隔离**：
+  - 删除 Word 实体类的 familiarity 字段（原为全局共享，不同用户数据会混淆）
+  - 学习卡片操作只写入 user_word_familiarity 表（按 userId + wordId 隔离）
+  - 学习模式、学习报告、测试系统全部统一读取 UserWordFamiliarity
+  - 未学过的单词默认熟悉度 50
 
   **MySQL 需要手动执行**：
   ```sql
   ALTER TABLE words MODIFY COLUMN similar_meanings TEXT;
   ALTER TABLE words MODIFY COLUMN similar_spellings TEXT;
+  ALTER TABLE words DROP COLUMN familiarity;
   ```
+
+## 2026-05-29
+
+### 性能优化和生词本优化
+- **成员**: 蔡奕麟
+- **审查**: 蔡奕麟
+- **工作内容:**
+
+  **修复 N+1 查询性能问题**：
+  - getLowFamiliarityWords 在 Service 层预加载 familiarityMap 并直接构建返回数据
+  - 移除了 Controller 层对每个单词单独调用 getUserFamiliarity 的 N+1 查询
+  - 原来 7000+ 个单词要多查 7000+ 次数据库
+
+  **生词本复习改为卡片模式**
+  - 新增 /api/mistake/review/list 接口，返回生词本单词含用户熟悉度
+  - 新增 /api/mistake/review/known 接口：移出生词本，熟悉度设为 max(当前,70)
+  - 新增 /api/mistake/review/unfamiliar 接口：复习时标记"不认识"，增加复习次数
+  - 前端改为全屏卡片复习模式：
+    - 在生词本页面点击"开始复习"或单个"复习"按钮弹出逐词卡片
+    - 卡片依次显示单词、音标、词性、释义、当前熟悉度
+    - "认识" → 移出生词本 + 熟悉度设为 max(当前,70) → 自动下一张
+    - "不认识" → 仅记录复习次数，保留在生词本 → 自动下一张
+    - 所有词复习完后显示鼓励语和掌握统计
+    - 复习过程中已"认识"的词会从列表实时移除
+
+  **学习报告增加单词列表**:
+  - 新增 /api/report/wordList?userId=X&filter=all|mastered|unmastered 接口
+  - 点击"总词汇量"弹窗显示所有可访问单词列表（词 + 释义 + 熟悉度%）
+  - 弹窗支持按全部/已掌握/未掌握筛选切换
+  - 点击"已掌握单词"直接跳转到已掌握筛选列表

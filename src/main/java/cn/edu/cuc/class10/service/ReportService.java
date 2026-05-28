@@ -116,6 +116,42 @@ public class ReportService {
         return response;
     }
 
+    /**
+     * 获取单词列表（供报告详情查看）
+     * @param filter all | mastered | unmastered
+     */
+    public List<Map<String, Object>> getWordList(String userId, String filter) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        List<Word> accessibleWords = getAccessibleWords(user);
+
+        Map<String, Integer> familiarityMap = familiarityRepository.findByUserId(userId)
+                .stream()
+                .collect(Collectors.toMap(
+                        UserWordFamiliarity::getWordId,
+                        UserWordFamiliarity::getFamiliarity,
+                        (v1, v2) -> v1
+                ));
+
+        return accessibleWords.stream()
+                .filter(w -> {
+                    int fam = familiarityMap.getOrDefault(w.getWordId(), 50);
+                    if ("mastered".equals(filter)) return fam >= 70;
+                    if ("unmastered".equals(filter)) return fam < 70;
+                    return true; // all
+                })
+                .map(w -> {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("wordId", w.getWordId());
+                    item.put("content", w.getContent());
+                    item.put("translation", w.getTranslation());
+                    item.put("familiarity", familiarityMap.getOrDefault(w.getWordId(), 50));
+                    return item;
+                })
+                .sorted((a, b) -> ((String) a.get("content")).compareTo((String) b.get("content")))
+                .collect(Collectors.toList());
+    }
+
     private List<Word> getAccessibleWords(User user) {
         List<Word> allWords = wordRepository.findAll();
         String userPhase = user.getPhase();
