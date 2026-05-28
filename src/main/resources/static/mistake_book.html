@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生词本 - 单词管家</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .header h1 { color: #667eea; }
+        .back-btn {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        .back-btn:hover { background: #764ba2; }
+        .stats-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .stats-number {
+            font-size: 48px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stats-label { color: #666; margin-top: 8px; }
+        .words-list {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .word-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s;
+        }
+        .word-item:hover { background: #f5f7ff; }
+        .word-item:last-child { border-bottom: none; }
+        .word-info { flex: 1; }
+        .word-content { font-size: 20px; font-weight: bold; color: #333; }
+        .word-translation { color: #666; margin-top: 4px; }
+        .word-actions { display: flex; gap: 10px; }
+        .action-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .btn-review { background: #667eea; color: white; }
+        .btn-review:hover { background: #764ba2; }
+        .btn-remove { background: #f44336; color: white; }
+        .btn-remove:hover { background: #d32f2f; }
+        .empty-state {
+            text-align: center;
+            padding: 50px;
+            color: #999;
+        }
+        .loading { text-align: center; padding: 40px; color: #666; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>📕 生词本</h1>
+        <a href="dashboard.html" class="back-btn">← 返回首页</a>
+    </div>
+
+    <div class="stats-card">
+        <div class="stats-number" id="totalCount">0</div>
+        <div class="stats-label">生词总数</div>
+    </div>
+
+    <div class="words-list" id="wordsList">
+        <div class="loading">加载中...</div>
+    </div>
+</div>
+
+<script>
+    let currentUser = null;
+    let mistakeWords = [];
+
+    window.onload = async () => {
+        currentUser = getCurrentUser();
+        if (!currentUser) return;
+        await loadMistakeWords();
+    };
+
+    function getCurrentUser() {
+        const userStr = localStorage.getItem('currentUser');
+        if (!userStr) {
+            alert('请先登录');
+            window.location.href = '/login.html';
+            return null;
+        }
+        try {
+            return JSON.parse(userStr);
+        } catch(e) {
+            return null;
+        }
+    }
+
+    async function loadMistakeWords() {
+        try {
+            const response = await fetch(`/api/mistake/list?userId=${currentUser.userId}`);
+            const result = await response.json();
+            
+            if (result.code === 200) {
+                mistakeWords = result.data || [];
+                document.getElementById('totalCount').textContent = mistakeWords.length;
+                renderMistakeWords();
+            } else {
+                showError('加载失败：' + (result.message || '未知错误'));
+            }
+        } catch (err) {
+            console.error(err);
+            showError('网络错误，请稍后重试');
+        }
+    }
+
+    function renderMistakeWords() {
+        const container = document.getElementById('wordsList');
+        
+        if (mistakeWords.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <h3>🎉 太棒了！</h3>
+                    <p>你的生词本是空的，继续保持！</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = mistakeWords.map(item => `
+            <div class="word-item">
+                <div class="word-info">
+                    <div class="word-content">${item.word.content}</div>
+                    <div class="word-translation">${item.word.translation}</div>
+                </div>
+                <div class="word-actions">
+                    <button class="action-btn btn-review" onclick="reviewWord('${item.wordId}')">复习</button>
+                    <button class="action-btn btn-remove" onclick="removeWord('${item.wordId}', '${item.word.content}')">移除</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function reviewWord(wordId) {
+        // 跳转到学习模式，复习这个单词
+        window.location.href = `/study.html?review=${wordId}`;
+    }
+
+    async function removeWord(wordId, wordContent) {
+        if (!confirm(`确定要从生词本中移除"${wordContent}"吗？`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/mistake/remove', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: currentUser.userId,
+                    wordId: wordId
+                })
+            });
+            const result = await response.json();
+            
+            if (result.code === 200) {
+                alert('已移除');
+                loadMistakeWords();
+            } else {
+                alert('移除失败：' + (result.message || '未知错误'));
+            }
+        } catch (err) {
+            console.error(err);
+            alert('网络错误');
+        }
+    }
+
+    function showError(message) {
+        document.getElementById('wordsList').innerHTML = `
+            <div class="empty-state" style="color: #d32f2f;">
+                <h3>😵 加载失败</h3>
+                <p>${message}</p>
+            </div>
+        `;
+    }
+</script>
+</body>
+</html>

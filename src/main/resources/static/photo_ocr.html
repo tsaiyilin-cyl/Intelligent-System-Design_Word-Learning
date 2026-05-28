@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>照片识词 - 单词管家</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container { max-width: 1000px; margin: 20px auto; }
+
+        .header {
+            background: white;
+            padding: 18px 28px;
+            border-radius: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+        }
+        .header h1 { color: #667eea; font-size: 22px; }
+        .back-btn {
+            background: #667eea;
+            color: white;
+            padding: 8px 18px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        .back-btn:hover { background: #5a6fd6; }
+
+        .main-card {
+            background: white;
+            border-radius: 16px;
+            margin-top: 22px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .card-banner {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 28px 32px;
+            color: white;
+        }
+        .card-banner h2 { font-size: 20px; margin-bottom: 6px; }
+        .card-banner p { font-size: 14px; opacity: 0.85; }
+
+        .card-body { padding: 28px 32px; }
+
+        .upload-zone {
+            display: flex;
+            gap: 28px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .preview-area {
+            width: 380px;
+            height: 280px;
+            border-radius: 12px;
+            border: 2px dashed #d0d5e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #f8f9fc;
+            overflow: hidden;
+            position: relative;
+            transition: border-color 0.3s, background 0.3s;
+            cursor: pointer;
+        }
+        .preview-area:hover { border-color: #667eea; background: #f0f2ff; }
+        .preview-area.dragover { border-color: #667eea; background: #eef0ff; }
+        .preview-area img {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 8px;
+        }
+        .preview-placeholder {
+            text-align: center;
+            color: #aaa;
+        }
+        .preview-placeholder .icon { font-size: 48px; margin-bottom: 10px; }
+        .preview-placeholder p { font-size: 14px; }
+        .preview-placeholder .hint { font-size: 12px; color: #ccc; margin-top: 6px; }
+
+        .action-panel { flex: 1; min-width: 280px; }
+
+        .file-input-wrapper {
+            position: relative;
+            margin-bottom: 16px;
+        }
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            top: 0; left: 0;
+        }
+        .file-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 18px;
+            border: 2px dashed #d0d5e0;
+            border-radius: 10px;
+            color: #666;
+            font-size: 14px;
+            background: #fafbfd;
+            transition: border-color 0.3s;
+        }
+        .file-label:hover { border-color: #667eea; color: #667eea; }
+        .file-label .file-icon { font-size: 22px; }
+
+        .btn-group { display: flex; gap: 10px; margin-bottom: 18px; }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-outline {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        .btn-outline:hover { background: #f0f2ff; }
+
+        .result-section { margin-top: 4px; }
+        .result-section label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #444;
+            margin-bottom: 8px;
+        }
+        .result-box {
+            width: 100%;
+            height: 140px;
+            border-radius: 10px;
+            border: 1px solid #e8e8e8;
+            padding: 12px 14px;
+            font-size: 14px;
+            line-height: 1.6;
+            resize: vertical;
+            background: #fafbfd;
+            color: #333;
+            transition: border-color 0.3s;
+        }
+        .result-box:focus { outline: none; border-color: #667eea; background: white; }
+
+        .tip-bar {
+            margin-top: 20px;
+            padding: 14px 18px;
+            background: #f5f0ff;
+            border-radius: 10px;
+            border-left: 4px solid #764ba2;
+            color: #666;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+        .tip-bar code {
+            background: #ede7f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .file-name {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 12px;
+            word-break: break-all;
+        }
+        .file-name span { color: #667eea; font-weight: 600; }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
+
+        @media (max-width: 768px) {
+            .upload-zone { flex-direction: column; }
+            .preview-area { width: 100%; height: 220px; }
+            .action-panel { min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>📷 照片识词</h1>
+        <a href="/dashboard.html" class="back-btn">← 返回首页</a>
+    </div>
+
+    <div class="main-card">
+        <div class="card-banner">
+            <h2>📸 拍照识别单词</h2>
+            <p>上传或拍摄照片，自动识别画面中的物体并推荐对应英文单词，一键加入你的词汇库</p>
+        </div>
+
+        <div class="card-body">
+            <div class="upload-zone">
+                <div class="preview-area" id="imgPreview" onclick="document.getElementById('fileInput').click()">
+                    <div class="preview-placeholder" id="placeholder">
+                        <div class="icon">🖼️</div>
+                        <p>点击或拖拽图片到此处</p>
+                        <div class="hint">支持 jpg / png 格式</div>
+                    </div>
+                </div>
+
+                <div class="action-panel">
+                    <div class="file-input-wrapper">
+                        <div class="file-label">
+                            <span class="file-icon">📁</span>
+                            <span id="fileText">选择图片文件…</span>
+                        </div>
+                        <input type="file" id="fileInput" accept="image/*">
+                    </div>
+
+                    <div class="file-name" id="fileName" style="display:none">
+                        已选择：<span id="fileNameText"></span>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="recognizeBtn" disabled>🔍 开始识别</button>
+                        <button class="btn btn-outline" id="clearBtn">🗑️ 清除</button>
+                    </div>
+
+                    <div class="result-section">
+                        <label>🏷️ 识别结果</label>
+                        <textarea class="result-box" id="ocrResult" placeholder="识别结果将在这里显示…&#10;&#10;上传照片后点击'开始识别'即可查看" readonly></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tip-bar">
+                💡 <strong>提示：</strong>此页面为前端示意，暂未接入真实 OCR 服务。
+                后端建议接口：<code>/api/ocr</code>（multipart/form-data），返回识别到的物体名称列表。
+                接入后可自动翻译并支持一键添加到词汇库。
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const imgPreview = document.getElementById('imgPreview');
+    const placeholder = document.getElementById('placeholder');
+    const recognizeBtn = document.getElementById('recognizeBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const ocrResult = document.getElementById('ocrResult');
+    const fileNameDiv = document.getElementById('fileName');
+    const fileNameText = document.getElementById('fileNameText');
+    const fileText = document.getElementById('fileText');
+    let currentFile = null;
+
+    imgPreview.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        imgPreview.classList.add('dragover');
+    });
+    imgPreview.addEventListener('dragleave', () => {
+        imgPreview.classList.remove('dragover');
+    });
+    imgPreview.addEventListener('drop', (e) => {
+        e.preventDefault();
+        imgPreview.classList.remove('dragover');
+        const f = e.dataTransfer.files[0];
+        if (f && f.type.startsWith('image/')) {
+            handleFile(f);
+        }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        const f = e.target.files[0];
+        if (f) handleFile(f);
+    });
+
+    function handleFile(f) {
+        currentFile = f;
+        const url = URL.createObjectURL(f);
+        imgPreview.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = url;
+        imgPreview.appendChild(img);
+        recognizeBtn.disabled = false;
+        ocrResult.value = '';
+        fileNameDiv.style.display = 'block';
+        fileNameText.textContent = f.name;
+        fileText.textContent = f.name;
+    }
+
+    recognizeBtn.addEventListener('click', () => {
+        if (!currentFile) return;
+        recognizeBtn.disabled = true;
+        recognizeBtn.innerHTML = '<span class="loading-spinner"></span>识别中…';
+        setTimeout(() => {
+            ocrResult.value = `（示意）已上传文件：${currentFile.name}\n文件大小：${Math.round(currentFile.size / 1024)} KB\n\n示例识别文本：\n- example  示例\n- test  测试\n- photo  照片`;
+            recognizeBtn.innerHTML = '🔍 开始识别';
+            recognizeBtn.disabled = false;
+        }, 1200);
+    });
+
+    clearBtn.addEventListener('click', () => {
+        fileInput.value = null;
+        currentFile = null;
+        imgPreview.innerHTML = '';
+        imgPreview.appendChild(placeholder);
+        recognizeBtn.disabled = true;
+        recognizeBtn.innerHTML = '🔍 开始识别';
+        ocrResult.value = '';
+        fileNameDiv.style.display = 'none';
+        fileText.textContent = '选择图片文件…';
+    });
+</script>
+</body>
+</html>

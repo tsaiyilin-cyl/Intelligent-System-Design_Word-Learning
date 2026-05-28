@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>单词管家 - 主页</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .navbar h1 {
+            font-size: 24px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .username-link {
+            color: white;
+            text-decoration: none;
+            padding: 5px 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .username-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .current-time {
+            color: white;
+            font-size: 16px;
+            font-weight: 500;
+            padding: 5px 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+        }
+
+        .btn-logout {
+            padding: 8px 20px;
+            background: white;
+            color: #667eea;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: transform 0.2s;
+        }
+
+        .btn-logout:hover {
+            transform: translateY(-2px);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .welcome-card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .welcome-card h2 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .user-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .detail-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+
+        .detail-item label {
+            display: block;
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .detail-item value {
+            display: block;
+            color: #333;
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .menu-card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .menu-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .menu-card .icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .menu-card h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .menu-card p {
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>📚 单词管家</h1>
+        <div class="user-info">
+            <span class="current-time" id="currentTime"></span>
+            <a href="/profile.html" class="username-link" id="username"></a>
+            <button class="btn-logout" onclick="logout()">退出登录</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="welcome-card">
+            <h2>欢迎回来！<span id="welcome-username"></span></h2>
+            <p>今天也是充满学习动力的一天 💪</p>
+            
+            <div class="user-details">
+                <div class="detail-item">
+                    <label>学习阶段</label>
+                    <value id="phase"></value>
+                </div>
+                <div class="detail-item">
+                    <label>学习类型</label>
+                    <value id="userType"></value>
+                </div>
+            </div>
+        </div>
+
+        <div class="menu-grid">
+            <div class="menu-card" onclick="window.location.href='/study.html'">
+                <div class="icon">📖</div>
+                <h3>单词学习</h3>
+                <p>浏览单词卡片，记录熟悉度</p>
+            </div>
+
+            <div class="menu-card" onclick="window.location.href='/test.html'">
+                <div class="icon">✍️</div>
+                <h3>单词测试</h3>
+                <p>多种题型，检验学习成果</p>
+            </div>
+
+            <div class="menu-card" onclick="window.location.href='/study_plan.html'">
+                <div class="icon">📅</div>
+                <h3>学习计划</h3>
+                <p>制定计划，追踪进度</p>
+            </div>
+
+            <div class="menu-card" onclick="window.location.href='learning_report.html'">
+                <div class="icon">📊</div>
+                <h3>学习报告</h3>
+                <p>查看学习数据和AI建议</p>
+            </div>
+
+            <div class="menu-card" onclick="window.location.href='/photo_ocr.html'">
+                <div class="icon">📷</div>
+                <h3>照片识词</h3>
+                <p>拍照识别，添加新单词</p>
+            </div>
+
+            <div class="menu-card" onclick="window.location.href='/mistake_book.html'">
+                <div class="icon">📕</div>
+                <h3>生词本</h3>
+                <p>复习不熟悉的单词</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载时检查用户登录状态
+        window.addEventListener('load', function() {
+            const currentUser = localStorage.getItem('currentUser');
+            
+            if (!currentUser) {
+                // 未登录，跳转到登录页
+                window.location.href = '/login.html';
+                return;
+            }
+
+            // 显示用户信息
+            const user = JSON.parse(currentUser);
+            document.getElementById('username').textContent = user.username;
+            document.getElementById('welcome-username').textContent = user.username;
+            
+            // 翻译学习阶段
+            const phaseMap = {
+                'primary': '小学',
+                'junior': '初中',
+                'senior': '高中'
+            };
+            document.getElementById('phase').textContent = phaseMap[user.phase] || user.phase;
+            
+            // 翻译学习类型
+            const typeMap = {
+                'quiz': '刷题型',
+                'memory': '记忆型'
+            };
+            document.getElementById('userType').textContent = typeMap[user.userType] || user.userType;
+            
+            // 更新时间显示
+            updateCurrentTime();
+            setInterval(updateCurrentTime, 1000); // 每秒更新一次
+        });
+
+        // 更新当前时间
+        function updateCurrentTime() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            
+            const timeString = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+            document.getElementById('currentTime').textContent = timeString;
+        }
+
+        // 退出登录
+        async function logout() {
+            const currentUser = localStorage.getItem('currentUser');
+            if (!currentUser) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            const user = JSON.parse(currentUser);
+            
+            try {
+                const response = await fetch(`/api/logout?username=${user.username}`);
+                const result = await response.json();
+
+                if (result.code === 200) {
+                    // 清除本地存储
+                    localStorage.removeItem('currentUser');
+                    // 跳转到登录页
+                    window.location.href = '/login.html';
+                } else {
+                    alert(result.message || '登出失败');
+                }
+            } catch (error) {
+                console.error('登出错误:', error);
+                alert('网络错误，请稍后重试');
+            }
+        }
+    </script>
+</body>
+</html>

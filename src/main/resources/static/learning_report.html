@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习报告 - 单词管家</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .header h1 { color: #667eea; }
+        .nav-buttons a {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            margin-left: 10px;
+            transition: 0.2s;
+        }
+        .nav-buttons a:hover { background: #5a6fd6; }
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 12px;
+            transition: transform 0.2s;
+        }
+        .stat-item:hover { transform: translateY(-3px); }
+        .stat-number {
+            font-size: 36px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label { color: #666; margin-top: 8px; }
+        canvas { max-height: 300px; width: 100%; }
+        .test-list { margin-top: 15px; }
+        .test-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+            align-items: center;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+        .test-row:hover {
+            background-color: #f5f7ff;
+            transform: translateX(4px);
+        }
+        .test-row:last-child { border-bottom: none; }
+        .badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        .mistake-list { list-style: none; }
+        .mistake-list li {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error-message {
+            color: #d32f2f;
+            background: #ffebee;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        @media (max-width: 768px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .test-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+            .header { flex-direction: column; gap: 15px; }
+            .nav-buttons a { margin: 5px; }
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>📊 学习报告</h1>
+        <div class="nav-buttons">
+            <a href="study.html">单词学习</a>
+            <a href="test.html">单词测试</a>
+            <a href="dashboard.html">返回首页</a>
+        </div>
+    </div>
+
+    <div id="content">
+        <div class="loading">加载中...</div>
+    </div>
+</div>
+
+<script>
+    let currentUser = null;
+    let accuracyChart = null;
+
+    window.onload = async () => {
+        currentUser = getCurrentUser();
+        if (!currentUser) return;
+        await loadReportData();
+    };
+
+    function getCurrentUser() {
+        const userStr = localStorage.getItem('currentUser');
+        if (!userStr) {
+            alert('请先登录');
+            window.location.href = '/login.html';
+            return null;
+        }
+        try {
+            return JSON.parse(userStr);
+        } catch(e) {
+            return null;
+        }
+    }
+
+    async function loadReportData() {
+        const contentDiv = document.getElementById('content');
+        try {
+            const response = await fetch(`/api/report/dashboard?userId=${currentUser.userId}`);
+            const result = await response.json();
+            if (result.code === 200 && result.data) {
+                renderReport(result.data);
+            } else {
+                contentDiv.innerHTML = `<div class="error-message">加载失败：${result.message || '未知错误'}</div>`;
+            }
+        } catch (err) {
+            console.error(err);
+            contentDiv.innerHTML = '<div class="error-message">网络错误，请稍后重试</div>';
+        }
+    }
+
+    // 跳转到报告详情页
+    function viewTestDetail(sessionId) {
+        if (!sessionId) {
+            alert('无法查看该测试的详情：缺少会话标识');
+            return;
+        }
+        // 传递 fromPage 参数，让 report.html 知道从哪里来的
+        window.location.href = `/report.html?sessionId=${sessionId}&fromPage=learning_report`;
+    }
+
+    function renderReport(data) {
+        const container = document.createElement('div');
+
+        // 统计卡片
+        const statsHtml = `
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number">${data.totalWords}</div>
+                    <div class="stat-label">总词汇量</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">${data.masteredWords}</div>
+                    <div class="stat-label">已掌握单词</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">${data.averageAccuracy.toFixed(1)}%</div>
+                    <div class="stat-label">近7天平均正确率</div>
+                </div>
+            </div>
+        `;
+        container.innerHTML = statsHtml;
+
+        // 正确率趋势图
+        const chartCard = document.createElement('div');
+        chartCard.className = 'card';
+        chartCard.innerHTML = '<h3>📈 近7天测试正确率趋势</h3><canvas id="accuracyChart"></canvas>';
+        container.appendChild(chartCard);
+
+        // 最近测试记录 (可点击)
+        const testsCard = document.createElement('div');
+        testsCard.className = 'card';
+        let testsHtml = '<h3>📋 最近5次测试记录 <span style="font-size:14px; font-weight:normal;">(点击任意记录查看详情)</span></h3><div class="test-list">';
+        if (data.recentTests.length === 0) {
+            testsHtml += '<p>暂无测试记录</p>';
+        } else {
+            data.recentTests.forEach(test => {
+                const date = new Date(test.endTime).toLocaleString();
+                const typeText = getTypeText(test.questionType);
+                const accuracy = test.accuracy.toFixed(1);
+                testsHtml += `
+                    <div class="test-row" onclick="viewTestDetail('${test.sessionId}')">
+                        <span>📅 ${date}</span>
+                        <span class="badge">${typeText}</span>
+                        <span>✅ ${test.correct}/${test.total}</span>
+                        <span style="color: ${accuracy >= 60 ? '#4caf50' : '#f44336'}">🎯 ${accuracy}%</span>
+                        <span style="font-size:12px; color:#667eea;">🔍 点击查看详情 →</span>
+                    </div>
+                `;
+            });
+        }
+        testsHtml += '</div>';
+        testsCard.innerHTML = testsHtml;
+        container.appendChild(testsCard);
+
+        // 易错词 TOP 5
+        const mistakesCard = document.createElement('div');
+        mistakesCard.className = 'card';
+        let mistakesHtml = '<h3>🔍 易错词 TOP 5</h3><ul class="mistake-list">';
+        if (data.topMistakes.length === 0) {
+            mistakesHtml += '<li>暂无易错词，继续保持！</li>';
+        } else {
+            data.topMistakes.forEach(m => {
+                mistakesHtml += `<li><span>${m.wordContent}</span><span style="color:#f44336">错误 ${m.mistakeCount} 次</span></li>`;
+            });
+        }
+        mistakesHtml += '</ul>';
+        mistakesCard.innerHTML = mistakesHtml;
+        container.appendChild(mistakesCard);
+
+        document.getElementById('content').innerHTML = '';
+        document.getElementById('content').appendChild(container);
+
+        // 渲染图表
+        const ctx = document.getElementById('accuracyChart').getContext('2d');
+        if (accuracyChart) accuracyChart.destroy();
+        const dates = data.recentAccuracy.map(d => d.date);
+        const accuracies = data.recentAccuracy.map(d => d.accuracy);
+        accuracyChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: '正确率 (%)',
+                    data: accuracies,
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102,126,234,0.1)',
+                    tension: 0.2,
+                    fill: true,
+                    pointBackgroundColor: '#667eea',
+                    pointBorderColor: '#fff',
+                    pointRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 100,
+                        title: { display: true, text: '正确率 (%)' }
+                    },
+                    x: {
+                        title: { display: true, text: '日期' }
+                    }
+                }
+            }
+        });
+    }
+
+    function getTypeText(type) {
+        switch(type) {
+            case 'en2zh': return '英译中';
+            case 'zh2en': return '中译英';
+            case 'spelling': return '拼写填空';
+            default: return type;
+        }
+    }
+</script>
+</body>
+</html>

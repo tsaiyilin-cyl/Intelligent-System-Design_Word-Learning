@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>本次测试结果 - 单词管家</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            width: 100%;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        .result-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+        h2 {
+            color: #333;
+            margin-bottom: 8px;
+        }
+        .score {
+            font-size: 48px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 20px 0;
+        }
+        .score span {
+            font-size: 24px;
+            color: #999;
+        }
+        .accuracy {
+            font-size: 24px;
+            margin-bottom: 20px;
+            padding: 8px 16px;
+            background: #f0f0f0;
+            border-radius: 40px;
+            display: inline-block;
+        }
+        .detail {
+            text-align: left;
+            background: #f8f9ff;
+            border-radius: 16px;
+            padding: 16px;
+            margin: 20px 0;
+        }
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .detail-item:last-child {
+            border-bottom: none;
+        }
+        .label {
+            color: #666;
+        }
+        .value {
+            font-weight: bold;
+            color: #333;
+        }
+        .buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 40px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5a6fd6;
+            transform: translateY(-2px);
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #666;
+        }
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        .error-message {
+            color: #d32f2f;
+            background: #ffebee;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        .answer-records {
+            margin-top: 24px;
+            text-align: left;
+        }
+        .answer-records h3 {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #667eea;
+        }
+        .record-item {
+            background: #f8f9ff;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border-left: 4px solid #667eea;
+        }
+        .record-item.correct {
+            border-left-color: #4caf50;
+        }
+        .record-item.incorrect {
+            border-left-color: #f44336;
+        }
+        .record-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .record-index {
+            font-weight: bold;
+            color: #667eea;
+        }
+        .record-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .record-status.correct {
+            background: #e8f5e9;
+            color: #4caf50;
+        }
+        .record-status.incorrect {
+            background: #ffebee;
+            color: #f44336;
+        }
+        .record-content {
+            font-size: 16px;
+            margin: 8px 0;
+            color: #333;
+        }
+        .record-answer {
+            font-size: 14px;
+            margin: 4px 0;
+            padding: 8px;
+            background: white;
+            border-radius: 8px;
+        }
+        .record-answer .label {
+            color: #666;
+            font-weight: normal;
+        }
+        .record-answer .value {
+            color: #333;
+            font-weight: bold;
+        }
+        .record-answer.user-correct .value {
+            color: #4caf50;
+        }
+        .record-answer.user-incorrect .value {
+            color: #f44336;
+        }
+        footer {
+            margin-top: 20px;
+            color: rgba(255,255,255,0.8);
+            text-align: center;
+            font-size: 14px;
+        }
+        .history-badge {
+            background: #e8eaf6;
+            color: #3949ab;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: inline-block;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card" id="resultCard">
+        <!-- 动态内容会在此显示 -->
+    </div>
+    <footer>单词管家 · 助你轻松背单词</footer>
+</div>
+
+<script>
+    (function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('sessionId');
+        const isHistory = !!sessionId;
+        const fromPage = urlParams.get('fromPage') || 'dashboard';  // 记录来源页面
+
+        const card = document.getElementById('resultCard');
+
+        // 显示通用错误界面
+        function showError(message, showRetry = true) {
+            card.innerHTML = `
+                <div class="result-icon">😵</div>
+                <h2>无法显示结果</h2>
+                <div class="error-message">${message}</div>
+                <div class="buttons">
+                    <a href="test.html" class="btn btn-primary">去测试</a>
+                    <a href="dashboard.html" class="btn btn-secondary">返回首页</a>
+                </div>
+            `;
+        }
+
+        // 核心渲染函数：根据报告数据渲染界面
+        function renderReport(data) {
+            const { total, correct, accuracy, questionType, endTime, answerRecords, isHistoryMode } = data;
+            let icon = '🎉';
+            if (accuracy >= 90) icon = '🏆';
+            else if (accuracy >= 70) icon = '👍';
+            else if (accuracy >= 50) icon = '😐';
+            else icon = '💪';
+
+            let timeStr = '';
+            if (endTime) {
+                const date = new Date(endTime);
+                timeStr = `${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()} ${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`;
+            }
+
+            let typeText = '';
+            switch(questionType) {
+                case 'en2zh': typeText = '英译中（选择题）'; break;
+                case 'zh2en': typeText = '中译英（选择题）'; break;
+                case 'spelling': typeText = '拼写填空'; break;
+                default: typeText = questionType;
+            }
+
+            let html = `
+                <div class="result-icon">${icon}</div>
+                <h2>${isHistoryMode ? '📜 历史测试详情' : '测试完成'}</h2>
+                ${isHistoryMode ? '<div class="history-badge">📌 历史记录</div>' : ''}
+                <div class="score">
+                    ${correct} <span>/ ${total}</span>
+                </div>
+                <div class="accuracy">
+                    正确率 ${accuracy}%
+                </div>
+                <div class="detail">
+                    <div class="detail-item">
+                        <span class="label">题型</span>
+                        <span class="value">${typeText}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">完成时间</span>
+                        <span class="value">${timeStr}</span>
+                    </div>
+                </div>
+            `;
+
+            if (answerRecords && answerRecords.length > 0) {
+                html += `<div class="answer-records"><h3>📝 答题详情</h3>`;
+                answerRecords.forEach((record, index) => {
+                    const statusClass = record.isCorrect ? 'correct' : 'incorrect';
+                    const statusText = record.isCorrect ? '✓ 正确' : '✗ 错误';
+                    html += `
+                        <div class="record-item ${statusClass}">
+                            <div class="record-header">
+                                <span class="record-index">第 ${index + 1} 题</span>
+                                <span class="record-status ${statusClass}">${statusText}</span>
+                            </div>
+                            <div class="record-content">
+                                <strong>${escapeHtml(record.questionContent || '')}</strong>
+                            </div>
+                            <div class="record-answer user-${statusClass}">
+                                <span class="label">你的答案：</span>
+                                <span class="value">${escapeHtml(record.userAnswer || '')}</span>
+                            </div>
+                            <div class="record-answer">
+                                <span class="label">正确答案：</span>
+                                <span class="value">${escapeHtml(record.correctAnswer || '')}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            } else {
+                html += `<p style="margin-top:16px; color:#999;">暂无答题详情记录</p>`;
+            }
+
+            // 根据来源页面决定返回按钮的文字
+            let returnButtonText = '返回首页';
+            if (fromPage === 'learning_report') {
+                returnButtonText = '返回学习报告';
+            }
+            
+            html += `
+                <div class="buttons">
+                    <a href="test.html" class="btn btn-primary">再次测试</a>
+                    <a href="${fromPage}.html" class="btn btn-secondary">${returnButtonText}</a>
+                </div>
+            `;
+            if (!isHistoryMode) {
+                html += `<p style="margin-top: 16px; font-size: 13px; color: #999;">
+                            💡 本次测试结果已保存，可在个人报告中查看历史记录
+                        </p>`;
+            } else {
+                html += `<p style="margin-top: 16px; font-size: 13px; color: #999;">
+                            📌 这是您保存在系统中的历史测试记录
+                        </p>`;
+            }
+            card.innerHTML = html;
+        }
+
+        // 辅助函数：防止XSS
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+                return c;
+            });
+        }
+
+        // 从后端加载历史测试详情
+        async function loadHistoryReport(sessionId) {
+            try {
+                const response = await fetch(`/api/test/detail/${sessionId}`);
+                const result = await response.json();
+                if (result.code === 200 && result.data) {
+                    const session = result.data.session;
+                    const records = result.data.records || [];
+
+                    // 转换 records 为前端需要的格式
+                    const answerRecords = records.map(rec => ({
+                        questionIndex: rec.questionIndex,
+                        questionContent: rec.questionContent || '',
+                        correctAnswer: rec.correctAnswer || '',
+                        userAnswer: rec.userAnswer || '',
+                        isCorrect: rec.isCorrect === true,
+                        options: rec.optionsJson ? JSON.parse(rec.optionsJson) : []
+                    }));
+
+                    const reportData = {
+                        total: session.totalQuestions,
+                        correct: session.correctCount,
+                        accuracy: session.totalQuestions === 0 ? 0 : Math.round((session.correctCount / session.totalQuestions) * 100),
+                        questionType: session.questionType,
+                        endTime: session.endTime,
+                        answerRecords: answerRecords,
+                        isHistoryMode: true
+                    };
+                    renderReport(reportData);
+                } else {
+                    showError('未找到对应的测试记录，可能已被删除。');
+                }
+            } catch (err) {
+                console.error('加载历史测试失败:', err);
+                showError('网络错误，无法加载历史测试详情。');
+            }
+        }
+
+        // 从 localStorage 加载刚刚完成的测试结果
+        function loadLocalReport() {
+            const fromTest = urlParams.get('from') === 'test';
+            const storedResult = localStorage.getItem('latestTestResult');
+            if (!fromTest || !storedResult) {
+                showError('请通过完成测试来查看结果。');
+                return false;
+            }
+            let result;
+            try {
+                result = JSON.parse(storedResult);
+            } catch(e) {
+                showError('结果数据损坏，请重新测试。');
+                return false;
+            }
+            if (typeof result.total !== 'number' || typeof result.correct !== 'number' ||
+                typeof result.accuracy !== 'number' || !result.questionType) {
+                showError('结果数据不完整，请重新测试。');
+                return false;
+            }
+            // 构建并渲染
+            const reportData = {
+                total: result.total,
+                correct: result.correct,
+                accuracy: result.accuracy,
+                questionType: result.questionType,
+                endTime: result.endTime,
+                answerRecords: result.answerRecords || [],
+                isHistoryMode: false
+            };
+            renderReport(reportData);
+            return true;
+        }
+
+        // 启动逻辑
+        if (sessionId) {
+            loadHistoryReport(sessionId);
+        } else {
+            loadLocalReport();
+        }
+    })();
+</script>
+</body>
+</html>
