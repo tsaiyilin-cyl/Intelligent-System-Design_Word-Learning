@@ -2,14 +2,17 @@ package cn.edu.cuc.class10.service;
 
 import cn.edu.cuc.class10.entity.MistakeWord;
 import cn.edu.cuc.class10.entity.Word;
+import cn.edu.cuc.class10.entity.UserWordFamiliarity;
 import cn.edu.cuc.class10.entity.WordType;
 import cn.edu.cuc.class10.repository.MistakeWordRepository;
+import cn.edu.cuc.class10.repository.UserWordFamiliarityRepository;
 import cn.edu.cuc.class10.repository.WordRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -24,7 +27,26 @@ public class WordService {
     @Autowired
     private MistakeWordRepository mistakeWordRepository;
 
+    @Autowired
+    private UserWordFamiliarityRepository familiarityRepository;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @PostConstruct
+    public void migrateDefaultFamiliarity() {
+        List<Word> words = wordRepository.findAll();
+        boolean changed = false;
+        for (Word word : words) {
+            if (word.getFamiliarity() != null && word.getFamiliarity() == 0) {
+                word.setFamiliarity(50);
+                wordRepository.save(word);
+                changed = true;
+            }
+        }
+        if (changed) {
+            System.out.println("Migrated word familiarity defaults: 0 -> 50");
+        }
+    }
 
     public Word addWord(String content, String partOfSpeech, String translation,
                         String phonetic, WordType wordType) {
@@ -271,6 +293,24 @@ public class WordService {
         Word word = wordOpt.get();
         word.setFamiliarity(newFamiliarity);
         wordRepository.save(word);
+    }
+
+    /**
+     * 更新单词熟悉度（同步更新 words 表和 user_word_familiarity 表）
+     * 用于学习卡片操作，确保学习报告和测试系统能看到一致的数据
+     */
+    public void updateWordFamiliarity(String wordId, int newFamiliarity, String userId) {
+        // 1. 更新 words 表
+        updateWordFamiliarity(wordId, newFamiliarity);
+
+        // 2. 同步更新 user_word_familiarity 表
+        if (userId != null) {
+            UserWordFamiliarity uf = familiarityRepository.findByUserIdAndWordId(userId, wordId)
+                    .orElse(new UserWordFamiliarity(userId, wordId, newFamiliarity, System.currentTimeMillis()));
+            uf.setFamiliarity(newFamiliarity);
+            uf.setLastUpdate(System.currentTimeMillis());
+            familiarityRepository.save(uf);
+        }
     }
 
     /**

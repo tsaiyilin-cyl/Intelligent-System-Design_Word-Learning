@@ -204,8 +204,6 @@
   - `src/main/resources/static/dashboard.html` - 添加仪表盘数据统计展示
   - `src/main/resources/static/learning_report.html` - 新建学习报告页面
   - `src/main/resources/static/report.html` - 新建测试详情页面，支持智能返回逻辑
-
-  #### 4. 修改/新增文件清单
   - `src/main/java/cn/edu/cuc/class10/entity/Interaction.java` - 新增
   - `src/main/java/cn/edu/cuc/class10/entity/UserWordFamiliarity.java` - 新增
   - `src/main/java/cn/edu/cuc/class10/entity/UserWordFamiliarityId.java` - 新增
@@ -277,6 +275,7 @@
   - 创建 MistakeController，提供 RESTful API（/api/mistake/list, /add, /remove, /count）
   - 创建 mistake_book.html 页面，展示用户的生词列表，支持复习和移除
   - dashboard.html 将“错题本”模块改为“生词本”，链接到 mistake_book.html
+
 ## 2026-05-24
 
 ### 学习模式和生词本开发
@@ -301,3 +300,34 @@
   - 当用户答错题目时，自动调用 addToMistakeBookIfNotExists() 方法
   - 通过 findByUserIdAndWordId() 检查是否已存在，避免重复添加
   - 只有答错的单词才会被加入生词本，答对的不会
+
+## 2026-05-28
+
+### 优化交互体验，修改部分错误
+- **成员**: 蔡奕麟
+- **审查**: 蔡奕麟
+- **工作内容**:
+  **相似词群自动计算**：
+  - 新增 SimilarityInitializer，启动时自动计算所有单词的相似词义群和相似词样群
+  - 相似词样群（similarSpellings）：按首字母分组 + 长度过滤，计算 Levenshtein 编辑距离 ≤2 的形似词
+  - 相似词义群（similarMeanings）：按词性分组，计算中文释义汉字重叠率 ≥30% 的近义词
+  - 每个单词每类最多保存 8 个相似词
+
+  **测试干扰项优化**：
+  - 英译中选择：干扰项优先从该词的相似词样群（形似词）的释义中抽取
+  - 中译英选择：干扰项优先从该词的相似词义群（近义词）的拼写中抽取
+  - 相似词不够时回退到随机选取
+
+  **修复学习卡片操作与报告数据不同步的问题**：
+  - 学习卡片操作（熟悉/模糊/不熟悉/已掌握）现在同步写入 words 表和 user_word_familiarity 表
+  - 学习报告 dashboard 现可正确统计学习卡片产生的掌握数据
+
+  **修复未学单词默认熟悉度显示问题**：
+  - Word 构造函数默认熟悉度从 0 改为 50
+  - 启动时自动迁移数据库中现有 familiarity=0 的记录为 50
+
+  **MySQL 需要手动执行**：
+  ```sql
+  ALTER TABLE words MODIFY COLUMN similar_meanings TEXT;
+  ALTER TABLE words MODIFY COLUMN similar_spellings TEXT;
+  ```

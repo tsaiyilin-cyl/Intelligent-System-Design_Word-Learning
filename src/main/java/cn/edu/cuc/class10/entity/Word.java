@@ -57,7 +57,7 @@ public class Word {
         this.translation = translation;
         this.phonetic = phonetic;
         this.wordType = wordType;
-        this.familiarity = 0;
+        this.familiarity = 50;
     }
 
     public Word(String content, String partOfSpeech, String translation,
@@ -68,7 +68,7 @@ public class Word {
         this.phonetic = phonetic;
         this.wordType = wordType;
         this.phase = phase;
-        this.familiarity = 0;
+        this.familiarity = 50;
     }
 
     public String getWordId() {

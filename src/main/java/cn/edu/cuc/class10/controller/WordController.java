@@ -307,8 +307,8 @@ public class WordController {
                     return result;
             }
 
-            // 更新熟悉度
-            wordService.updateWordFamiliarity(wordId, newFamiliarity);
+            // 更新熟悉度（同步写入 words 表和 user_word_familiarity 表）
+            wordService.updateWordFamiliarity(wordId, newFamiliarity, userId);
 
             // 如果需要，添加到生词本
             if (addToMistakeBook && userId != null) {

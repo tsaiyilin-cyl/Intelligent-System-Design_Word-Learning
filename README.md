@@ -114,7 +114,9 @@ taskkill /F /PID xxx
       INDEX idx_user_id (`user_id`),
       UNIQUE KEY uk_user_word (`user_id`, `word_id`)
   );
-
+    ALTER TABLE words MODIFY COLUMN similar_meanings TEXT;
+    ALTER TABLE words MODIFY COLUMN similar_spellings TEXT;
+```
 
 # 开发者事项
 
