@@ -32,10 +32,10 @@ public class Word {
     @Column
     private Integer familiarity = 0;
 
-    @Column(length = 500)
+    @Column(length = 2000)
     private String similarMeanings;
 
-    @Column(length = 500)
+    @Column(length = 2000)
     private String similarSpellings;
 
     @Column(columnDefinition = "TEXT")

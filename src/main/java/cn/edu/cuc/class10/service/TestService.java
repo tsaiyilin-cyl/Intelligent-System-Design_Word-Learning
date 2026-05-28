@@ -14,6 +14,8 @@ import cn.edu.cuc.class10.repository.WordRepository;
 import cn.edu.cuc.class10.repository.UserWordFamiliarityRepository;
 import cn.edu.cuc.class10.repository.TestSessionRepository;
 import cn.edu.cuc.class10.repository.TestAnswerRecordRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +41,7 @@ public class TestService {
     @Autowired
     private MistakeWordRepository mistakeWordRepository;
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private Random random = new Random();
     @Transactional
     public Map<String, Object> generateQuestions(String userId, int count, String type) {
@@ -121,12 +124,10 @@ public class TestService {
                 q.setContent(word.getContent());
                 List<String> options = new ArrayList<>();
                 options.add(word.getTranslation());
-                List<Word> others = wordRepository.findAll().stream()
-                        .filter(w -> !w.getWordId().equals(word.getWordId()))
-                        .limit(3)
-                        .collect(Collectors.toList());
-                for (Word other : others) options.add(other.getTranslation());
-                Collections.shuffle(options);
+                // 从相似拼写群获取干扰项（形似词干扰）
+                List<String> distractors = getDistractorsFromSimilarity(word, "en2zh_choice", 3);
+                options.addAll(distractors);
+                Collections.shuffle(options, random);
                 q.setOptions(options);
                 q.setCorrectAnswer(word.getTranslation());
                 break;
@@ -134,12 +135,10 @@ public class TestService {
                 q.setContent(word.getTranslation());
                 options = new ArrayList<>();
                 options.add(word.getContent());
-                others = wordRepository.findAll().stream()
-                        .filter(w -> !w.getWordId().equals(word.getWordId()))
-                        .limit(3)
-                        .collect(Collectors.toList());
-                for (Word other : others) options.add(other.getContent());
-                Collections.shuffle(options);
+                // 从相似词义群获取干扰项（近义词干扰）
+                distractors = getDistractorsFromSimilarity(word, "zh2en_choice", 3);
+                options.addAll(distractors);
+                Collections.shuffle(options, random);
                 q.setOptions(options);
                 q.setCorrectAnswer(word.getContent());
                 break;
@@ -181,6 +180,71 @@ public class TestService {
         Word word;
         double weight;
         WordWeight(Word word, double weight) { this.word = word; this.weight = weight; }
+    }
+
+    /**
+     * 从相似词群中获取干扰选项
+     * - en2zh_choice: 从相似拼写群（形似词）获取其释义作为干扰项
+     * - zh2en_choice: 从相似词义群（近义词）获取其拼写作为干扰项
+     */
+    private List<String> getDistractorsFromSimilarity(Word word, String questionType, int count) {
+        Set<String> distractors = new LinkedHashSet<>();
+
+        try {
+            String jsonField = "en2zh_choice".equals(questionType)
+                    ? word.getSimilarSpellings()
+                    : word.getSimilarMeanings();
+            if (jsonField == null || jsonField.isEmpty()) return randomFallback(word, questionType, count);
+
+            List<Map<String, Object>> similarEntries = objectMapper.readValue(
+                    jsonField,
+                    new TypeReference<List<Map<String, Object>>>() {}
+            );
+
+            for (Map<String, Object> entry : similarEntries) {
+                String similarWordId = (String) entry.get("word_id");
+                wordRepository.findById(similarWordId).ifPresent(similarWord -> {
+                    String option = "en2zh_choice".equals(questionType)
+                            ? similarWord.getTranslation()
+                            : similarWord.getContent();
+                    if (option != null && !option.isEmpty()
+                            && !option.equals(word.getTranslation())
+                            && !option.equals(word.getContent())) {
+                        distractors.add(option);
+                    }
+                });
+                if (distractors.size() >= count) break;
+            }
+        } catch (Exception ignored) {
+            // Fall through to random fallback
+        }
+
+        if (distractors.size() < count) {
+            distractors.addAll(randomFallback(word, questionType, count - distractors.size()));
+        }
+
+        List<String> result = new ArrayList<>(distractors);
+        Collections.shuffle(result, random);
+        return result.size() > count ? result.subList(0, count) : result;
+    }
+
+    /**
+     * 随机获取干扰项（兜底方案）
+     */
+    private List<String> randomFallback(Word word, String questionType, int count) {
+        List<Word> others = wordRepository.findAll().stream()
+                .filter(w -> !w.getWordId().equals(word.getWordId()))
+                .collect(Collectors.toList());
+        Collections.shuffle(others, random);
+
+        return others.stream()
+                .map(w -> "en2zh_choice".equals(questionType) ? w.getTranslation() : w.getContent())
+                .filter(opt -> opt != null && !opt.isEmpty()
+                        && !opt.equals(word.getTranslation())
+                        && !opt.equals(word.getContent()))
+                .distinct()
+                .limit(count)
+                .collect(Collectors.toList());
     }
 
     /**
