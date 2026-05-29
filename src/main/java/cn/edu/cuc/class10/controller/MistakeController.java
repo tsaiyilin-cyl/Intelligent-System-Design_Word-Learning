@@ -106,7 +106,7 @@ public class MistakeController {
     }
 
     /**
-     * 从生词本移除单词（熟悉度设为 max(当前,70)）
+     * 从生词本移除单词（熟悉度设为 max(2×当前, 70)，上限230）
      */
     @Transactional(rollbackFor = Exception.class)
     @PostMapping("/remove")
@@ -124,11 +124,11 @@ public class MistakeController {
 
             mistakeWordRepository.deleteByUserIdAndWordId(userId, wordId);
 
-            // 熟悉度设为 max(衰减后当前, 70)
+            // 熟悉度设为 max(衰减后当前×2, 70)，上限230
             UserWordFamiliarity uf = familiarityRepository.findByUserIdAndWordId(userId, wordId)
                     .orElse(new UserWordFamiliarity(userId, wordId, 70, System.currentTimeMillis()));
             int decayed = applyDecay(uf.getFamiliarity(), uf.getLastUpdate());
-            int newFam = Math.max(decayed, 70);
+            int newFam = Math.min(230, Math.max(70, decayed * 2));
             uf.setFamiliarity(newFam);
             uf.setLastUpdate(System.currentTimeMillis());
             familiarityRepository.save(uf);

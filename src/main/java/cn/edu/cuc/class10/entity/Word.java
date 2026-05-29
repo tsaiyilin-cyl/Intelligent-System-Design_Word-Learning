@@ -29,6 +29,9 @@ public class Word {
     @Column(length = 20)
     private String phase;
 
+    @Column(length = 50)
+    private String userId; // 自建词汇的所属用户ID，考纲词为null
+
     @Column(length = 2000)
     private String similarMeanings;
 
@@ -120,6 +123,14 @@ public class Word {
 
     public void setPhase(String phase) {
         this.phase = phase;
+    }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
     }
 
     public String getSimilarMeanings() {

@@ -17,6 +17,8 @@ public interface WordRepository extends JpaRepository<Word, String> {
 
     boolean existsByContent(String content);
 
+    boolean existsByContentAndUserIdAndWordType(String content, String userId, WordType wordType);
+
     List<Word> findByWordType(WordType wordType);
 
     @Query("SELECT w FROM Word w WHERE LOWER(w.content) LIKE LOWER(CONCAT('%', :keyword, '%')) " +

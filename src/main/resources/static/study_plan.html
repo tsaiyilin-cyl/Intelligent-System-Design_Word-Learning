@@ -275,7 +275,6 @@
             <div class="progress-item">
                 <div class="progress-label">
                     <span>今日完成度</span>
-                    <span id="todayProgress">0%</span>
                 </div>
                 <div class="progress-bar">
                     <div class="progress-fill" id="todayProgressBar" style="width: 0%"></div>
@@ -285,7 +284,6 @@
             <div class="progress-item">
                 <div class="progress-label">
                     <span>掌握率</span>
-                    <span id="masteryRate">0%</span>
                 </div>
                 <div class="progress-bar">
                     <div class="progress-fill" id="masteryProgressBar" style="width: 0%"></div>
@@ -372,14 +370,12 @@
                     const goal = d.dailyGoal || 10;
                     const todayLearned = d.todayLearned || 0;
                     const todayPercent = Math.min(Math.round((todayLearned / goal) * 100), 100);
-                    document.getElementById('todayProgress').textContent = todayPercent + '%';
                     document.getElementById('todayProgressBar').style.width = todayPercent + '%';
 
                     // 掌握率
                     const total = d.totalWords || 0;
                     const mastered = d.masteredWords || 0;
                     const masteryRate = total > 0 ? Math.min(Math.round((mastered / total) * 100), 100) : 0;
-                    document.getElementById('masteryRate').textContent = masteryRate + '%';
                     document.getElementById('masteryProgressBar').style.width = masteryRate + '%';
                 }
             } catch (e) {

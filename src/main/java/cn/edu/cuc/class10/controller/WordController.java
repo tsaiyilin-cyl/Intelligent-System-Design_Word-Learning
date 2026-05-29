@@ -30,6 +30,7 @@ public class WordController {
             @RequestParam String translation,
             @RequestParam(required = false) String phonetic,
             @RequestParam String wordType,
+            @RequestParam(required = false) String userId,
             @RequestParam(required = false) String phrases,
             @RequestParam(required = false) String sentences) {
 
@@ -38,7 +39,7 @@ public class WordController {
         try {
             WordType type = WordType.valueOf(wordType);
 
-            Word word = wordService.addWord(content, partOfSpeech, translation, phonetic, type);
+            Word word = wordService.addWord(content, partOfSpeech, translation, phonetic, type, userId);
             
             // 如果是自建词汇，设置额外的可选字段
             if (type == WordType.CUSTOM) {
@@ -232,11 +233,12 @@ public class WordController {
     }
 
     @GetMapping("/statistics")
-    public Map<String, Object> getStatistics() {
+    public Map<String, Object> getStatistics(
+            @RequestParam(required = false) String userId) {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            Map<String, Object> stats = wordService.getWordStatistics();
+            Map<String, Object> stats = wordService.getWordStatistics(userId);
             result.put("code", 200);
             result.put("message", "查询成功");
             result.put("data", stats);

@@ -36,11 +36,16 @@ public class WordService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public Word addWord(String content, String partOfSpeech, String translation,
-                        String phonetic, WordType wordType) {
-        if (wordRepository.existsByContent(content)) {
-            throw new RuntimeException("单词已存在");
+                        String phonetic, WordType wordType, String userId) {
+        // 自建词：同一用户不能重复添加相同内容的词
+        if (wordType == WordType.CUSTOM && userId != null) {
+            if (wordRepository.existsByContentAndUserIdAndWordType(content, userId, WordType.CUSTOM)) {
+                throw new RuntimeException("您已添加过该单词");
+            }
+            Word newWord = new Word(content, partOfSpeech, translation, phonetic, wordType);
+            newWord.setUserId(userId);
+            return wordRepository.save(newWord);
         }
-
         Word newWord = new Word(content, partOfSpeech, translation, phonetic, wordType);
         return wordRepository.save(newWord);
     }
@@ -123,9 +128,12 @@ public class WordService {
 
     /**
      * 获取所有单词（按字典序），如果提供了 userId 则包含熟悉度
+     * 自建词汇只返回当前用户创建的
      */
     public List<java.util.Map<String, Object>> getAllWordsWithFamiliarity(String userId) {
-        List<Word> words = wordRepository.findAllOrderByContentAsc();
+        List<Word> words = wordRepository.findAllOrderByContentAsc().stream()
+                .filter(w -> w.getWordType() != WordType.CUSTOM || userId == null || userId.equals(w.getUserId()))
+                .collect(Collectors.toList());
         return attachFamiliarityToWords(words, userId);
     }
 
@@ -147,7 +155,9 @@ public class WordService {
      * 搜索单词（含熟悉度）
      */
     public List<java.util.Map<String, Object>> searchWordsWithFamiliarity(String keyword, String userId) {
-        List<Word> words = wordRepository.searchByKeyword(keyword);
+        List<Word> words = wordRepository.searchByKeyword(keyword).stream()
+                .filter(w -> w.getWordType() != WordType.CUSTOM || userId == null || userId.equals(w.getUserId()))
+                .collect(Collectors.toList());
         return attachFamiliarityToWords(words, userId);
     }
 
@@ -265,7 +275,7 @@ public class WordService {
         }
     }
 
-    public Map<String, Object> getWordStatistics() {
+    public Map<String, Object> getWordStatistics(String userId) {
         List<Word> allWords = wordRepository.findAll();
 
         long syllabusCount = allWords.stream()
@@ -273,11 +283,12 @@ public class WordService {
                 .count();
 
         long customCount = allWords.stream()
-                .filter(w -> w.getWordType() == WordType.CUSTOM)
+                .filter(w -> w.getWordType() == WordType.CUSTOM
+                        && (userId == null || userId.equals(w.getUserId())))
                 .count();
 
         Map<String, Object> stats = new java.util.HashMap<>();
-        stats.put("total", allWords.size());
+        stats.put("total", syllabusCount + customCount);
         stats.put("syllabusCount", syllabusCount);
         stats.put("customCount", customCount);
 
@@ -315,10 +326,13 @@ public class WordService {
                         if (userPhase != null && !isInUserPhase(word.getPhase(), userPhase)) return false;
                     } else if ("CUSTOM".equals(filterType)) {
                         if (word.getWordType() != WordType.CUSTOM) return false;
+                        if (!userId.equals(word.getUserId())) return false;
                     } else {
                         if (word.getWordType() == WordType.SYLLABUS && userPhase != null) {
                             if (!isInUserPhase(word.getPhase(), userPhase)) return false;
-                        } else if (word.getWordType() != WordType.CUSTOM && word.getWordType() != WordType.SYLLABUS) {
+                        } else if (word.getWordType() == WordType.CUSTOM) {
+                            if (!userId.equals(word.getUserId())) return false;
+                        } else if (word.getWordType() != WordType.SYLLABUS) {
                             return false;
                         }
                     }

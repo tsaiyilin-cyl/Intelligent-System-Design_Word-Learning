@@ -773,6 +773,16 @@
         .wordlist-item-fam.low { background: #fce4ec; color: #c62828; }
 
         /* ===== 原生 Select 样式 ===== */
+        .profile-edit-btn {
+            background: rgba(255,255,255,0.2) !important;
+            border: 1px solid rgba(255,255,255,0.35) !important;
+            color: #fff !important;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.1) !important;
+            transition: all 0.2s !important;
+        }
+        .profile-edit-btn:hover {
+            background: rgba(255,255,255,0.35) !important;
+        }
         .native-select {
             width:100%; height:36px;
             border:1px solid #dcdfe6;
@@ -887,7 +897,10 @@
                 <span class="time-display">{{ currentTime }}</span>
                 <el-dropdown trigger="click" @command="handleUserCommand">
                     <span class="user-dropdown-trigger">
-                        <span class="user-avatar">{{ userInitial }}</span>
+                        <span class="user-avatar" :style="avatarUrl ? { background:'none', overflow:'hidden' } : {}">
+                            <img v-if="avatarUrl" :src="avatarUrl" style="width:100%;height:100%;object-fit:cover;display:block;" />
+                            <span v-else>{{ userInitial }}</span>
+                        </span>
                         <span style="font-size:14px; color:var(--text-primary);">{{ user?.username || '用户' }}</span>
                         <el-icon><ArrowDown></ArrowDown></el-icon>
                     </span>
@@ -981,7 +994,7 @@
             <template v-if="currentView === 'study'">
                 <div class="page-header">
                     <h2>📖 单词学习</h2>
-                    <p>浏览单词卡片，记录熟悉度</p>
+                    <p>浏览单词卡片，开始学习</p>
                 </div>
                 <el-card shadow="never" style="border-radius:14px; margin-bottom:16px;">
                     <el-row :gutter="16" align="middle">
@@ -1011,9 +1024,18 @@
                         <el-col :span="24">
                             <span style="font-size:13px; color:var(--text-secondary); margin-right:12px;">统计：</span>
                             <span style="font-size:13px; color:var(--text-regular); margin-right:20px;">共 <b>{{ words.length }}</b> 个单词</span>
+                            <span style="font-size:12px; color:var(--text-secondary);">💡 只展示您不熟悉的词</span>
                         </el-col>
                     </el-row>
                 </el-card>
+
+                <!-- 搜索跨阶段提示 -->
+                <div v-if="searchHasOutOfPhase" style="background:#fff3e0; border:1px solid #ffe0b2; border-radius:10px; padding:12px 16px; margin-bottom:16px; display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:18px;">💡</span>
+                    <span style="font-size:13px; color:#e65100;">部分搜索结果不属于当前学习阶段（{{
+                        user?.phase === 'primary' ? '小学' : user?.phase === 'junior' ? '初中' : '高中'
+                    }}）考纲范围，仅供参考</span>
+                </div>
 
                 <!-- 单词卡片 -->
                 <div v-if="words.length > 0" class="words-grid">
@@ -1026,6 +1048,7 @@
                             <el-tag :type="w.wordType === 'CUSTOM' ? 'success' : 'primary'" size="small" effect="plain" round>
                                 {{ w.wordType === 'CUSTOM' ? '自建' : '考纲' }}
                             </el-tag>
+                            <el-tag v-if="w.outOfPhase" type="warning" size="small" effect="dark" round>其他阶段</el-tag>
                         </div>
                         <div class="wc-pos">{{ formatPos(w.partOfSpeech) }}</div>
                         <div class="wc-trans">{{ w.translation }}</div>
@@ -1292,6 +1315,7 @@
                             </span>
                             <span class="ml-count" style="white-space:nowrap;">复习 {{ mw.reviewCount || 0 }} 次</span>
                             <el-button size="small" type="primary" :icon="MagicStick" @click="startSingleMistakeReview(mw)" round>复习</el-button>
+                            <el-button size="small" type="danger" plain @click="removeMistakeWord(mw)" round>移除</el-button>
                         </div>
                     </div>
                 </div>
@@ -1317,6 +1341,7 @@
                         <button class="sc-btn sc-btn-unfamiliar" @click="handleMistakeReview('unfamiliar')" style="padding:16px 32px; font-size:16px;">🔄 还不熟</button>
                     </div>
                     <div class="sc-footer">
+                        <button @click="mistakeReviewShowDetail">🤔 有点模糊？查看单词详情</button>
                         <button @click="mistakeReviewActive = false">退出复习</button>
                     </div>
                 </div>
@@ -1324,47 +1349,111 @@
 
             <!-- 个人中心 -->
             <template v-if="currentView === 'profile'">
-                <div class="page-header" style="display:flex; justify-content:space-between; align-items:center;">
-                    <div>
-                        <h2>👤 个人中心</h2>
-                        <p>管理个人信息和学习设置</p>
+                <!-- 封面区域（头像、姓名、编辑按钮都在渐变区内） -->
+                <div style="height:150px; background:linear-gradient(135deg, #667eea 0%, #764ba2 50%, #9068e0 100%); border-radius:20px; position:relative; margin-bottom:24px; overflow:hidden;">
+                    <div style="position:absolute; top:0; left:0; right:0; bottom:0; background:url('data:image/svg+xml,%3Csvg width=%2760%27 height=%2760%27 viewBox=%270 0 60 60%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cg fill=%27none%27 fill-rule=%27evenodd%27%3E%3Cg fill=%27%23ffffff%27 fill-opacity=%270.05%27%3E%3Cpath d=%27M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z%27/%3E%3C/g%3E%3C/g%3E%3C/svg%3E') repeat;"></div>
+                    <!-- 头像 -->
+                    <div style="position:absolute; left:40px; top:50%; transform:translateY(-50%); cursor:pointer;" @click="triggerAvatarUpload" title="点击更换头像" @mouseenter="avatarHovered = true" @mouseleave="avatarHovered = false">
+                        <div style="width:80px; height:80px; border-radius:50%; background:rgba(255,255,255,0.25); display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:bold; border:4px solid rgba(255,255,255,0.6); box-shadow:0 4px 20px rgba(0,0,0,0.15); overflow:hidden; position:relative; color:#fff;">
+                            <img v-if="avatarUrl" :src="avatarUrl" style="width:100%; height:100%; object-fit:cover; display:block;" />
+                            <span v-else>{{ userInitial }}</span>
+                            <div :style="{ position:'absolute', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', opacity: avatarHovered ? 1 : 0, transition:'opacity 0.2s', color:'#fff', fontSize:'13px', borderRadius:'50%' }">📷</div>
+                        </div>
                     </div>
-                    <el-button type="primary" :icon="Edit" @click="openEditProfile" round>编辑资料</el-button>
+                    <!-- 用户名 + 标签 -->
+                    <div style="position:absolute; left:145px; top:50%; transform:translateY(-50%);">
+                        <h2 style="font-size:24px; font-weight:700; color:#fff; margin-bottom:10px;">{{ user?.username }}</h2>
+                        <div style="display:flex; gap:8px;">
+                            <el-tag :type="user?.phase === 'senior' ? 'warning' : user?.phase === 'junior' ? 'primary' : 'success'" effect="plain" round size="small" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:#fff;">
+                                {{ phaseMap[user?.phase] || user?.phase }}
+                            </el-tag>
+                            <el-tag style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:#fff;" effect="plain" round size="small">
+                                {{ user?.userType === 'quiz' ? '💪 刷题型' : '🧠 记忆型' }}
+                            </el-tag>
+                        </div>
+                    </div>
+                    <!-- 编辑按钮 -->
+                    <div style="position:absolute; right:24px; top:50%; transform:translateY(-50%);">
+                        <el-button :icon="Edit" @click="openEditProfile" round size="default" class="profile-edit-btn">
+                            编辑资料
+                        </el-button>
+                    </div>
+                    <!-- 隐藏的 file input -->
+                    <input type="file" ref="avatarFileInput" accept="image/*" @change="handleAvatarUpload" style="display:none;" />
                 </div>
+
+                <!-- 学习统计卡片 -->
+                <div class="stats-grid" style="margin-bottom:24px;">
+                    <div class="stat-card-el">
+                        <div class="stat-accent" style="background:#409eff;"></div>
+                        <div class="stat-label">📖 已学习</div>
+                        <div class="stat-value">{{ planData.totalWords }}</div>
+                        <div style="font-size:13px; color:#909399; margin-top:4px;">个单词</div>
+                        <div class="stat-icon">📚</div>
+                    </div>
+                    <div class="stat-card-el">
+                        <div class="stat-accent" style="background:#67c23a;"></div>
+                        <div class="stat-label">🎯 每日目标</div>
+                        <div class="stat-value">{{ user?.dailyGoal || 10 }}</div>
+                        <div style="font-size:13px; color:#909399; margin-top:4px;">词/天</div>
+                        <div class="stat-icon">🎯</div>
+                    </div>
+                    <div class="stat-card-el">
+                        <div class="stat-accent" style="background:#e6a23c;"></div>
+                        <div class="stat-label">🔥 连续打卡</div>
+                        <div class="stat-value">{{ planData.studyStreak }}</div>
+                        <div style="font-size:13px; color:#909399; margin-top:4px;">天</div>
+                        <div class="stat-icon">🔥</div>
+                    </div>
+                    <div class="stat-card-el">
+                        <div class="stat-accent" style="background:#f56c6c;"></div>
+                        <div class="stat-label">✅ 已掌握</div>
+                        <div class="stat-value">{{ planData.masteredWords }}</div>
+                        <div style="font-size:13px; color:#909399; margin-top:4px;">个单词</div>
+                        <div class="stat-icon">🏆</div>
+                    </div>
+                </div>
+
+                <!-- 学习进度 + 账号信息 -->
                 <el-row :gutter="16">
-                    <el-col :xs="24" :sm="8" style="margin-bottom:16px;">
-                        <el-card shadow="never" style="border-radius:14px; text-align:center; padding:20px;">
-                            <div style="width:72px; height:72px; border-radius:50%; background:var(--gradient); display:flex; align-items:center; justify-content:center; margin:0 auto 16px; color:#fff; font-size:32px; font-weight:bold;">
-                                {{ userInitial }}
+                    <el-col :xs="24" :sm="14" style="margin-bottom:16px;">
+                        <el-card shadow="never" style="border-radius:16px;">
+                            <template #header>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; background:var(--gradient); border-radius:6px; color:#fff; font-size:14px;">📊</span>
+                                    <span style="font-weight:600; font-size:15px;">学习进度</span>
+                                </div>
+                            </template>
+                            <div style="padding:4px 0;">
+                                <div style="margin-bottom:24px;">
+                                    <div style="display:flex; justify-content:space-between; margin-bottom:8px; color:#333; font-size:14px;">
+                                        <span>今日完成度</span>
+                                    </div>
+                                    <el-progress :percentage="todayProgress" :stroke-width="18" :color="todayProgress >= 100 ? '#67c23a' : undefined" />
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; margin-bottom:8px; color:#333; font-size:14px;">
+                                        <span>掌握率</span>
+                                    </div>
+                                    <el-progress :percentage="masteryRate" :stroke-width="18" :color="masteryRate >= 60 ? '#67c23a' : undefined" />
+                                </div>
                             </div>
-                            <h3 style="margin-bottom:4px;">{{ user?.username }}</h3>
                         </el-card>
                     </el-col>
-                    <el-col :xs="24" :sm="16" style="margin-bottom:16px;">
-                        <el-card shadow="never" style="border-radius:14px;">
-                            <template #header><span style="font-weight:600;">账号信息</span></template>
-                            <el-form label-width="100px">
-                                <el-form-item label="用户名">
-                                    <span>{{ user?.username }}</span>
-                                </el-form-item>
-                                <el-form-item label="学习阶段">
-                                    <el-tag :type="user?.phase === 'senior' ? 'warning' : user?.phase === 'junior' ? 'primary' : 'success'" effect="plain" round>
-                                        {{ phaseMap[user?.phase] || user?.phase }}
-                                    </el-tag>
-                                </el-form-item>
-                                <el-form-item label="学习类型">
-                                    <el-tag type="info" effect="plain" round>{{ user?.userType === 'quiz' ? '刷题型' : '记忆型' }}</el-tag>
-                                </el-form-item>
-                                <el-form-item label="每日目标">
-                                    <span>{{ user?.dailyGoal || 10 }} 词/天</span>
-                                </el-form-item>
-                                <el-form-item label="已学习">
-                                    <span>{{ planData.totalWords }} 词</span>
-                                </el-form-item>
-                                <el-form-item label="连续打卡">
-                                    <span>{{ planData.studyStreak }} 天</span>
-                                </el-form-item>
-                            </el-form>
+                    <el-col :xs="24" :sm="10" style="margin-bottom:16px;">
+                        <el-card shadow="never" style="border-radius:16px; height:100%;">
+                            <template #header>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; background:var(--gradient); border-radius:6px; color:#fff; font-size:14px;">👤</span>
+                                    <span style="font-weight:600; font-size:15px;">账号信息</span>
+                                </div>
+                            </template>
+                            <div style="padding:4px 0;">
+                                <div v-for="(item, idx) in profileInfoItems" :key="idx" style="display:flex; justify-content:space-between; align-items:center; padding:14px 0; border-bottom:1px solid #f5f6fa;">
+                                    <span style="color:#909399; font-size:14px;">{{ item.label }}</span>
+                                    <span style="color:#303133; font-weight:500; font-size:14px;">{{ item.value }}</span>
+                                </div>
+                            </div>
                         </el-card>
                     </el-col>
                 </el-row>
@@ -1410,14 +1499,12 @@
                         <div style="margin-bottom:24px;">
                             <div style="display:flex; justify-content:space-between; margin-bottom:8px; color:#333; font-size:14px;">
                                 <span>今日完成度</span>
-                                <span>{{ todayProgress }}%</span>
                             </div>
                             <el-progress :percentage="todayProgress" :stroke-width="16" :color="todayProgress >= 100 ? '#67c23a' : undefined" />
                         </div>
                         <div>
                             <div style="display:flex; justify-content:space-between; margin-bottom:8px; color:#333; font-size:14px;">
                                 <span>掌握率</span>
-                                <span>{{ masteryRate }}%</span>
                             </div>
                             <el-progress :percentage="masteryRate" :stroke-width="16" :color="masteryRate >= 60 ? '#67c23a' : undefined" />
                         </div>
@@ -1825,6 +1912,8 @@ const app = createApp({
             return words.value.slice(start, start + pageSize);
         });
 
+        const searchHasOutOfPhase = ref(false);
+
         watch(currentPage, () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         });
@@ -1892,7 +1981,7 @@ const app = createApp({
             addWordLoading.value = true;
             try {
                 const pos = addWordForm.posList.join('/');
-                let url = `/api/words/add?content=${encodeURIComponent(addWordForm.content)}&partOfSpeech=${encodeURIComponent(pos)}&translation=${encodeURIComponent(addWordForm.translation)}&wordType=CUSTOM`;
+                let url = `/api/words/add?content=${encodeURIComponent(addWordForm.content)}&partOfSpeech=${encodeURIComponent(pos)}&translation=${encodeURIComponent(addWordForm.translation)}&wordType=CUSTOM&userId=${encodeURIComponent(user.value.userId)}`;
                 if (addWordForm.phonetic) url += `&phonetic=${encodeURIComponent(addWordForm.phonetic)}`;
                 if (addWordForm.phrases) url += `&phrases=${encodeURIComponent(addWordForm.phrases)}`;
                 if (addWordForm.sentences) url += `&sentences=${encodeURIComponent(addWordForm.sentences)}`;
@@ -2068,7 +2157,7 @@ const app = createApp({
             else if (view === 'study') loadWords();
             else if (view === 'report') loadReport();
             else if (view === 'mistake') loadMistakeWords();
-            else if (view === 'study_plan' || view === 'profile') loadStudyPlan();
+            else if (view === 'study_plan' || view === 'profile') { loadStudyPlan(); loadAvatar(); }
         }
 
         function toggleSidebar() {
@@ -2082,7 +2171,7 @@ const app = createApp({
         // ========== 数据加载 ==========
         async function loadDashboard() {
             try {
-                const res = await axios.get('/api/words/statistics');
+                const res = await axios.get('/api/words/statistics', { params: { userId: user.value?.userId } });
                 if (res.data.code === 200) {
                     dashboardStats.total = res.data.data.total || 0;
                     dashboardStats.syllabus = res.data.data.syllabusCount || 0;
@@ -2095,6 +2184,17 @@ const app = createApp({
             wordsLoading.value = true;
             currentPage.value = 1;
             const uid = user.value?.userId;
+            // 按学习阶段过滤：初中包含小学，高中包含初中和小学
+            function allowedPhases(userPhase) {
+                const order = ['primary', 'junior', 'senior'];
+                const idx = order.indexOf(userPhase);
+                return idx >= 0 ? order.slice(0, idx + 1) : null;
+            }
+            const phaseFilter = allowedPhases(user.value?.phase);
+            function filterByPhase(list) {
+                if (!phaseFilter) return list;
+                return list.filter(w => !w.phase || phaseFilter.includes(w.phase));
+            }
             try {
                 const kw = studySearch.value.trim();
                 if (kw) {
@@ -2104,9 +2204,17 @@ const app = createApp({
                         if (studyFilter.value !== 'all') {
                             list = list.filter(w => w.wordType === studyFilter.value);
                         }
-                        // 只展示熟悉度 <= 60 的单词
-                        list = list.filter(w => (w.familiarity === undefined ? 50 : w.familiarity) <= 60);
+                        // 搜索时：标记不在当前学习阶段的词，但不隐藏；不过滤熟悉度
+                        if (phaseFilter) {
+                            list = list.map(w => ({
+                                ...w,
+                                outOfPhase: !!(w.phase && !phaseFilter.includes(w.phase))
+                            }));
+                        } else {
+                            list = list.map(w => ({ ...w, outOfPhase: false }));
+                        }
                         words.value = list;
+                        searchHasOutOfPhase.value = list.some(w => w.outOfPhase);
                     }
                 } else {
                     const res = await axios.get('/api/words/all/ordered', { params: { userId: uid } });
@@ -2115,9 +2223,12 @@ const app = createApp({
                         if (studyFilter.value !== 'all') {
                             list = list.filter(w => w.wordType === studyFilter.value);
                         }
+                        // 按学习阶段过滤
+                        list = filterByPhase(list);
                         // 只展示熟悉度 <= 60 的单词
                         list = list.filter(w => (w.familiarity === undefined ? 50 : w.familiarity) <= 60);
                         words.value = list;
+                        searchHasOutOfPhase.value = false;
                     }
                 }
             } catch (e) {
@@ -2643,6 +2754,28 @@ const app = createApp({
             mistakeReviewActive.value = true;
         }
 
+        async function removeMistakeWord(mw) {
+            try {
+                await ElementPlus.ElMessageBox.confirm(
+                    '确定移除该生词？移除则表示您已经熟悉该词',
+                    '确认移除',
+                    { confirmButtonText: '确定移除', cancelButtonText: '取消', type: 'warning' }
+                );
+                const res = await axios.post('/api/mistake/remove', {
+                    userId: user.value.userId,
+                    wordId: mw.wordId
+                });
+                if (res.data.code === 200) {
+                    ElementPlus.ElMessage.success('已从生词本移除');
+                    loadMistakeWords();
+                } else {
+                    ElementPlus.ElMessage.error(res.data.message || '操作失败');
+                }
+            } catch (e) {
+                if (e !== 'cancel') console.error(e);
+            }
+        }
+
         async function handleMistakeReview(action) {
             const w = mistakeReviewWord.value;
             if (!w) return;
@@ -2669,6 +2802,25 @@ const app = createApp({
             } catch (e) {
                 console.error(e);
                 ElementPlus.ElMessage.error('操作失败');
+            }
+        }
+
+        // ========== 生词本复习 - 查看单词详情 ==========
+        async function mistakeReviewShowDetail() {
+            const w = mistakeReviewWord.value;
+            if (!w || !w.wordId) return;
+            try {
+                const res = await axios.get('/api/words/get', {
+                    params: { wordId: w.wordId, userId: user.value?.userId }
+                });
+                if (res.data.code === 200) {
+                    showWordDetail(res.data.data);
+                } else {
+                    ElementPlus.ElMessage.warning('获取单词详情失败');
+                }
+            } catch (e) {
+                console.error(e);
+                ElementPlus.ElMessage.error('网络错误');
             }
         }
 
@@ -2753,6 +2905,45 @@ const app = createApp({
             { title: '保持连续性', content: '每天坚持学习，即使时间不长，也能形成良好的学习习惯，提升学习效果。' },
             { title: '多样化学习', content: '结合单词卡片、测试练习等多种方式，全方位巩固单词记忆。' }
         ];
+
+        const profileInfoItems = computed(() => [
+            { label: '用户名', value: user.value?.username || '-' },
+            { label: '学习阶段', value: phaseMap[user.value?.phase] || user.value?.phase || '-' },
+            { label: '学习类型', value: user.value?.userType === 'quiz' ? '刷题型' : '记忆型' },
+            { label: '每日目标', value: (user.value?.dailyGoal || 10) + ' 词/天' },
+            { label: '已学习', value: planData.totalWords + ' 词' },
+            { label: '连续打卡', value: planData.studyStreak + ' 天' }
+        ]);
+
+        // ========== 头像上传 ==========
+        const avatarUrl = ref('');
+        const avatarFileInput = ref(null);
+        const avatarHovered = ref(false);
+
+        function loadAvatar() {
+            const stored = localStorage.getItem('avatar_' + user.value?.userId);
+            if (stored) avatarUrl.value = stored;
+        }
+
+        function triggerAvatarUpload() {
+            avatarFileInput.value?.click();
+        }
+
+        function handleAvatarUpload(e) {
+            const file = e.target.files?.[0];
+            if (!file || !file.type.startsWith('image/')) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const dataUrl = ev.target?.result;
+                if (dataUrl && user.value?.userId) {
+                    avatarUrl.value = dataUrl;
+                    localStorage.setItem('avatar_' + user.value.userId, dataUrl);
+                    ElementPlus.ElMessage.success('头像已更新');
+                }
+            };
+            reader.readAsDataURL(file);
+            if (avatarFileInput.value) avatarFileInput.value.value = '';
+        }
 
         function openEditProfile() {
             if (!user.value) return;
@@ -2888,7 +3079,7 @@ const app = createApp({
             dashboardStats,
 
             // 单词学习
-            studyFilter, studySearch, words, wordsLoading,
+            studyFilter, studySearch, words, wordsLoading, searchHasOutOfPhase,
             currentPage, pageSize, paginatedWords,
             loadWords, showWordDetail, formatPos,
 
@@ -2927,7 +3118,9 @@ const app = createApp({
             // 报告辅助
             viewTestDetail, getTypeText, formatDate,
 
-            // 个人中心编辑
+            // 个人中心
+            profileInfoItems,
+            avatarUrl, avatarFileInput, avatarHovered, triggerAvatarUpload, handleAvatarUpload,
             editProfileVisible, editProfileForm, editProfileLoading,
             openEditProfile, saveProfile,
 
@@ -2943,7 +3136,7 @@ const app = createApp({
 
             // 生词本复习
             mistakeReviewActive, mistakeReviewWords, mistakeReviewIndex, mistakeReviewWord,
-            startMistakeReview, startSingleMistakeReview, handleMistakeReview,
+            startMistakeReview, startSingleMistakeReview, removeMistakeWord, handleMistakeReview, mistakeReviewShowDetail,
         };
     }
 });

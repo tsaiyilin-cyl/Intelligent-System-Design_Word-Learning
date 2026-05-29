@@ -288,9 +288,10 @@ public class ReportService {
     private List<Word> getAccessibleWords(User user) {
         List<Word> allWords = wordRepository.findAll();
         String userPhase = user.getPhase();
+        String uid = user.getUserId();
         return allWords.stream()
                 .filter(w -> (w.getWordType() == WordType.SYLLABUS && isPhaseMatch(w.getPhase(), userPhase))
-                        || w.getWordType() == WordType.CUSTOM)
+                        || (w.getWordType() == WordType.CUSTOM && uid.equals(w.getUserId())))
                 .collect(Collectors.toList());
     }
 
