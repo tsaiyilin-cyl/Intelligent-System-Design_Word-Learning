@@ -39,7 +39,7 @@ public class MistakeController {
         Map<String, Object> result = new HashMap<>();
         try {
             List<MistakeWord> mistakes = mistakeWordRepository.findByUserIdOrderByCreateTimeDesc(userId);
-            
+
             // 关联单词信息
             List<Map<String, Object>> data = mistakes.stream().map(mistake -> {
                 Map<String, Object> item = new HashMap<>();
@@ -47,7 +47,7 @@ public class MistakeController {
                 item.put("wordId", mistake.getWordId());
                 item.put("createTime", mistake.getCreateTime());
                 item.put("reviewCount", mistake.getReviewCount());
-                
+
                 // 获取单词详情
                 wordRepository.findById(mistake.getWordId()).ifPresent(word -> {
                     Map<String, Object> wordInfo = new HashMap<>();
@@ -56,10 +56,18 @@ public class MistakeController {
                     wordInfo.put("phonetic", word.getPhonetic());
                     item.put("word", wordInfo);
                 });
-                
+
+                // 获取用户对该词的有效熟悉度（含时间衰减）
+                int storedFam = familiarityRepository.findByUserIdAndWordId(userId, mistake.getWordId())
+                        .map(UserWordFamiliarity::getFamiliarity)
+                        .orElse(50);
+                Long lastTime = interactionRepository.findLastTimestampByUserAndWord(userId, mistake.getWordId())
+                        .orElse(null);
+                item.put("familiarity", applyDecay(storedFam, lastTime));
+
                 return item;
             }).collect(Collectors.toList());
-            
+
             result.put("code", 200);
             result.put("data", data);
         } catch (Exception e) {
