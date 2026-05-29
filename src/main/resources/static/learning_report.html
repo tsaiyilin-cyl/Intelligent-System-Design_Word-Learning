@@ -323,7 +323,7 @@
                         <div class="wordlist-item-content">${w.content}</div>
                         <div class="wordlist-item-trans">${w.translation}</div>
                     </div>
-                    <span class="wordlist-item-fam ${w.familiarity >= 70 ? 'high' : 'low'}">${Math.round(w.familiarity)}%</span>
+                    <span class="wordlist-item-fam ${Math.min(Math.round(w.familiarity), 100) >= 60 ? 'high' : 'low'}">${Math.min(Math.round(w.familiarity), 100)}%</span>
                 </div>
             `).join('');
         } catch(e) {

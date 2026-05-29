@@ -28,39 +28,6 @@ taskkill /F /PID xxx
 3、建表命令：
 其他建表 SQL（手动执行）
   ```sql
-  
-  CREATE TABLE `users` (
-  `user_id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `phase` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `user_type` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `username` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `password` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `daily_goal` int DEFAULT NULL,
-  `last_study_date` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `mastered_words` int DEFAULT NULL,
-  `study_streak` int DEFAULT NULL,
-  `total_words` int DEFAULT NULL,
-  PRIMARY KEY (`user_id`),
-  UNIQUE KEY `UKr43af9ap4edm43mmtq01oddj6` (`username`)
-  );
-  
-  CREATE TABLE `words` (
-  `word_id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `content` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `extra_attributes` text COLLATE utf8mb4_unicode_ci,
-  `familiarity` int DEFAULT NULL,
-  `part_of_speech` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `phase` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `phonetic` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `phrases` text COLLATE utf8mb4_unicode_ci,
-  `sentences` text COLLATE utf8mb4_unicode_ci,
-  `similar_meanings` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `similar_spellings` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `translation` varchar(1000) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `word_type` enum('CUSTOM','SYLLABUS') COLLATE utf8mb4_unicode_ci NOT NULL,
-  PRIMARY KEY (`word_id`)
-  );
-
   CREATE TABLE `interactions` (
       `interaction_id` VARCHAR(36) PRIMARY KEY,
       `user_id` VARCHAR(36) NOT NULL,

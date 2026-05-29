@@ -133,11 +133,20 @@ public class ReportService {
                         (v1, v2) -> v1
                 ));
 
+        Map<String, Long> lastInteractionMap = interactionRepository.findLastTimestampByUser(userId)
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> (String) ((Object[]) row)[0],
+                        row -> (Long) ((Object[]) row)[1]
+                ));
+
         return accessibleWords.stream()
                 .filter(w -> {
-                    int fam = familiarityMap.getOrDefault(w.getWordId(), 50);
-                    if ("mastered".equals(filter)) return fam >= 70;
-                    if ("unmastered".equals(filter)) return fam < 70;
+                    int stored = familiarityMap.getOrDefault(w.getWordId(), 50);
+                    Long lastTime = lastInteractionMap.get(w.getWordId());
+                    int effective = applyDecay(stored, lastTime);
+                    if ("mastered".equals(filter)) return effective >= 60;
+                    if ("unmastered".equals(filter)) return effective < 60;
                     return true; // all
                 })
                 .map(w -> {
@@ -145,11 +154,26 @@ public class ReportService {
                     item.put("wordId", w.getWordId());
                     item.put("content", w.getContent());
                     item.put("translation", w.getTranslation());
-                    item.put("familiarity", familiarityMap.getOrDefault(w.getWordId(), 50));
+                    int stored = familiarityMap.getOrDefault(w.getWordId(), 50);
+                    Long lastTime = lastInteractionMap.get(w.getWordId());
+                    item.put("familiarity", applyDecay(stored, lastTime));
                     return item;
                 })
                 .sorted((a, b) -> ((String) a.get("content")).compareTo((String) b.get("content")))
                 .collect(Collectors.toList());
+    }
+
+    private int applyDecay(int storedFamiliarity, Long lastInteractionTime) {
+        if (lastInteractionTime == null || storedFamiliarity <= 0) return storedFamiliarity;
+        long days = (System.currentTimeMillis() - lastInteractionTime) / 86400000L;
+        if (days >= 7) {
+            return (int)(storedFamiliarity * 0.33 * 0.83 * 0.92);
+        } else if (days >= 4) {
+            return (int)(storedFamiliarity * 0.33 * 0.83);
+        } else if (days >= 2) {
+            return (int)(storedFamiliarity * 0.33);
+        }
+        return storedFamiliarity;
     }
 
     private List<Word> getAccessibleWords(User user) {

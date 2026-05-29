@@ -4,6 +4,7 @@ import cn.edu.cuc.class10.entity.MistakeWord;
 import cn.edu.cuc.class10.entity.Word;
 import cn.edu.cuc.class10.entity.UserWordFamiliarity;
 import cn.edu.cuc.class10.entity.WordType;
+import cn.edu.cuc.class10.repository.InteractionRepository;
 import cn.edu.cuc.class10.repository.MistakeWordRepository;
 import cn.edu.cuc.class10.repository.UserWordFamiliarityRepository;
 import cn.edu.cuc.class10.repository.WordRepository;
@@ -28,6 +29,9 @@ public class WordService {
 
     @Autowired
     private UserWordFamiliarityRepository familiarityRepository;
+
+    @Autowired
+    private InteractionRepository interactionRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -207,7 +211,7 @@ public class WordService {
     }
 
     /**
-     * 获取用户词汇域中熟悉度 <= 70 的单词（基于 UserWordFamiliarity，默认 50）
+     * 获取用户词汇域中有效熟悉度 <= 60 的单词（基于 UserWordFamiliarity + 艾宾浩斯时间衰减）
      * 返回数据已包含该用户的熟悉度，避免 N+1 查询
      */
     public List<java.util.Map<String, Object>> getLowFamiliarityWords(String userId, String userPhase, String filterType) {
@@ -220,6 +224,14 @@ public class WordService {
                         UserWordFamiliarity::getWordId,
                         UserWordFamiliarity::getFamiliarity,
                         (v1, v2) -> v1
+                ));
+
+        // 加载该用户所有单词的最后交互时间
+        java.util.Map<String, Long> lastInteractionMap = interactionRepository.findLastTimestampByUser(userId)
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> (String) ((Object[]) row)[0],
+                        row -> (Long) ((Object[]) row)[1]
                 ));
 
         return allWords.stream()
@@ -236,8 +248,9 @@ public class WordService {
                             return false;
                         }
                     }
-                    int familiarity = familiarityMap.getOrDefault(word.getWordId(), 50);
-                    return familiarity <= 70;
+                    int stored = familiarityMap.getOrDefault(word.getWordId(), 50);
+                    Long lastTime = lastInteractionMap.get(word.getWordId());
+                    return applyDecay(stored, lastTime) <= 60;
                 })
                 .map(word -> {
                     java.util.Map<String, Object> item = new java.util.HashMap<>();
@@ -252,7 +265,9 @@ public class WordService {
                     item.put("sentences", word.getSentences());
                     item.put("similarMeanings", word.getSimilarMeanings());
                     item.put("similarSpellings", word.getSimilarSpellings());
-                    item.put("familiarity", familiarityMap.getOrDefault(word.getWordId(), 50));
+                    int stored = familiarityMap.getOrDefault(word.getWordId(), 50);
+                    Long lastTime = lastInteractionMap.get(word.getWordId());
+                    item.put("familiarity", applyDecay(stored, lastTime));
                     return item;
                 })
                 .collect(Collectors.toList());
@@ -284,12 +299,48 @@ public class WordService {
     }
 
     /**
-     * 获取用户对单词的熟悉度（默认 50）
+     * 获取用户对单词的存储熟悉度（原始值，0-230，默认 50）
      */
     public int getUserFamiliarity(String userId, String wordId) {
         return familiarityRepository.findByUserIdAndWordId(userId, wordId)
                 .map(UserWordFamiliarity::getFamiliarity)
                 .orElse(50);
+    }
+
+    /**
+     * 获取经过时间衰减后的熟悉度基准值（用于更新前读取，基于熟悉度表自身的 lastUpdate）
+     * 确保后续的增减操作在已衰减的基础上进行，使衰减持久化到数据库
+     */
+    public int getDecayedBaselineFamiliarity(String userId, String wordId) {
+        return familiarityRepository.findByUserIdAndWordId(userId, wordId)
+                .map(uf -> applyDecay(uf.getFamiliarity(), uf.getLastUpdate()))
+                .orElse(50);
+    }
+
+    /**
+     * 根据艾宾浩斯遗忘曲线计算有效熟悉度
+     * ≥2天无交互 ×0.33，≥4天再×0.83，≥7天再×0.92
+     */
+    public int getEffectiveFamiliarity(String userId, String wordId) {
+        int stored = getUserFamiliarity(userId, wordId);
+        Long lastTime = interactionRepository.findLastTimestampByUserAndWord(userId, wordId).orElse(null);
+        return applyDecay(stored, lastTime);
+    }
+
+    /**
+     * 批量获取有效熟悉度（用于 getLowFamiliarityWords）
+     */
+    public int applyDecay(int storedFamiliarity, Long lastInteractionTime) {
+        if (lastInteractionTime == null || storedFamiliarity <= 0) return storedFamiliarity;
+        long days = (System.currentTimeMillis() - lastInteractionTime) / 86400000L;
+        if (days >= 7) {
+            return (int)(storedFamiliarity * 0.33 * 0.83 * 0.92);
+        } else if (days >= 4) {
+            return (int)(storedFamiliarity * 0.33 * 0.83);
+        } else if (days >= 2) {
+            return (int)(storedFamiliarity * 0.33);
+        }
+        return storedFamiliarity;
     }
 
     /**

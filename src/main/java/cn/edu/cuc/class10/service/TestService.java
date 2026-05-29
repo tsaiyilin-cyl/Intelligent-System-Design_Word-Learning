@@ -8,6 +8,7 @@ import cn.edu.cuc.class10.entity.WordType;
 import cn.edu.cuc.class10.entity.UserWordFamiliarity;
 import cn.edu.cuc.class10.entity.TestSession;
 import cn.edu.cuc.class10.entity.TestAnswerRecord;
+import cn.edu.cuc.class10.repository.InteractionRepository;
 import cn.edu.cuc.class10.repository.MistakeWordRepository;
 import cn.edu.cuc.class10.repository.UserRepository;
 import cn.edu.cuc.class10.repository.WordRepository;
@@ -41,6 +42,9 @@ public class TestService {
     @Autowired
     private MistakeWordRepository mistakeWordRepository;
 
+    @Autowired
+    private InteractionRepository interactionRepository;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private Random random = new Random();
     @Transactional
@@ -61,13 +65,37 @@ public class TestService {
                         (v1, v2) -> v1
                 ));
 
+        // 批量加载最后交互时间（用于衰减和3天判定）
+        Map<String, Long> lastInteractionMap = interactionRepository.findLastTimestampByUser(userId)
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> (String) ((Object[]) row)[0],
+                        row -> (Long) ((Object[]) row)[1]
+                ));
+
+        long threeDaysAgo = System.currentTimeMillis() - 3 * 86400000L;
+
         // 计算权重
         List<WordWeight> wordWeights = candidateWords.stream()
                 .map(word -> {
-                    int familiarity = familiarityMap.getOrDefault(word.getWordId(), 50);
-                    double weight = (100 - familiarity) / 100.0;
-                    if ("memory".equals(user.getUserType()) && familiarity >= 40 && familiarity <= 70) {
-                        weight *= 1.5;
+                    int storedFam = familiarityMap.getOrDefault(word.getWordId(), 50);
+                    Long lastTime = lastInteractionMap.get(word.getWordId());
+                    int effectiveFam = applyDecay(storedFam, lastTime);
+                    // 以有效熟悉度（封顶100）计算基础权重
+                    double weight = (100 - Math.min(effectiveFam, 100)) / 100.0;
+                    if (weight < 0.01) weight = 0.01;
+
+                    String userType = user.getUserType();
+                    if ("memory".equals(userType)) {
+                        // 记忆型：40-80区间翻倍
+                        if (storedFam >= 40 && storedFam <= 80) {
+                            weight *= 2;
+                        }
+                    } else if ("quiz".equals(userType)) {
+                        // 刷题型：3天内测试过的降权
+                        if (lastTime != null && lastTime > threeDaysAgo) {
+                            weight *= 0.1;
+                        }
                     }
                     return new WordWeight(word, weight);
                 })
@@ -245,6 +273,22 @@ public class TestService {
                 .distinct()
                 .limit(count)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 艾宾浩斯遗忘曲线衰减：≥2天 ×0.33，≥4天再×0.83，≥7天再×0.92
+     */
+    private int applyDecay(int storedFamiliarity, Long lastInteractionTime) {
+        if (lastInteractionTime == null || storedFamiliarity <= 0) return storedFamiliarity;
+        long days = (System.currentTimeMillis() - lastInteractionTime) / 86400000L;
+        if (days >= 7) {
+            return (int)(storedFamiliarity * 0.33 * 0.83 * 0.92);
+        } else if (days >= 4) {
+            return (int)(storedFamiliarity * 0.33 * 0.83);
+        } else if (days >= 2) {
+            return (int)(storedFamiliarity * 0.33);
+        }
+        return storedFamiliarity;
     }
 
     /**

@@ -183,6 +183,17 @@
             cursor: pointer;
             margin-top: 15px;
         }
+        .review-btn-exit {
+            background: none;
+            border: none;
+            color: #999;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 12px;
+            padding: 6px 16px;
+            text-decoration: underline;
+        }
+        .review-btn-exit:hover { color: #f44336; }
         .review-complete {
             padding: 30px;
         }
@@ -228,6 +239,28 @@
         <div class="review-actions" id="reviewActions">
             <button class="review-btn review-btn-known" onclick="reviewKnown()">✓ 认识</button>
             <button class="review-btn review-btn-unfamiliar" onclick="reviewUnfamiliar()">✗ 不认识</button>
+        </div>
+        <button class="review-btn-exit" onclick="closeReview()">结束复习</button>
+        <div id="reviewDetailLink" style="margin-top: 6px;"></div>
+    </div>
+</div>
+
+<!-- 单词详情弹窗 -->
+<div id="detailModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 3000; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 15px; max-width: 600px; width: 90%; display: flex; flex-direction: column; max-height: 80vh;">
+        <div style="padding: 20px 30px 0 30px; flex-shrink: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="color: #667eea;">📖 单词详情</h2>
+                <span onclick="closeDetailModal()" style="cursor: pointer; font-size: 28px; color: #999;">&times;</span>
+            </div>
+            <div id="detailWordTitle" style="margin-top: 8px; font-size: 24px; font-weight: bold; color: #333;"></div>
+            <div id="detailPhonetic" style="color: #999; font-size: 14px; font-style: italic; margin-top: 4px;"></div>
+        </div>
+        <div style="overflow-y: auto; padding: 0 30px 20px 30px;">
+            <div id="detailContent"></div>
+            <div id="detailButtons" style="margin-top: 20px; text-align: center;">
+                <button onclick="closeDetailModal()" style="padding: 12px 40px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer;">返回复习</button>
+            </div>
         </div>
     </div>
 </div>
@@ -345,18 +378,25 @@
         document.getElementById('reviewPos').textContent = word.partOfSpeech || '';
         document.getElementById('reviewPos').style.display = word.partOfSpeech ? 'inline-block' : 'none';
         document.getElementById('reviewTranslation').textContent = word.translation;
-        document.getElementById('reviewFam').textContent = `当前熟悉度：${word.familiarity}%`;
+        document.getElementById('reviewFam').textContent = `当前熟悉度：${Math.min(Math.round(word.familiarity), 100)}%`;
         document.getElementById('reviewActions').style.display = 'flex';
+        // 添加"看看单词详情"链接
+        document.getElementById('reviewDetailLink').innerHTML =
+            `<button onclick="showDetail('${word.wordId}')" style="background: none; border: none; color: #999; font-size: 13px; cursor: pointer; text-decoration: underline; padding: 2px 8px;">🤔 不太记得了？去看看单词详情</button>`;
     }
 
     async function reviewKnown() {
         const word = reviewList[reviewIndex];
         try {
-            await fetch('/api/mistake/review/known', {
+            const resp = await fetch('/api/mistake/review/known', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId: currentUser.userId, wordId: word.wordId })
             });
+            const result = await resp.json();
+            if (result.code === 200) {
+                word.familiarity = result.newFamiliarity;
+            }
         } catch(e) {}
 
         reviewKnownCount++;
@@ -370,11 +410,15 @@
     async function reviewUnfamiliar() {
         const word = reviewList[reviewIndex];
         try {
-            await fetch('/api/mistake/review/unfamiliar', {
+            const resp = await fetch('/api/mistake/review/unfamiliar', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId: currentUser.userId, wordId: word.wordId })
             });
+            const result = await resp.json();
+            if (result.code === 200) {
+                word.familiarity = result.newFamiliarity;
+            }
         } catch(e) {}
 
         reviewIndex++;
@@ -412,13 +456,15 @@
                 <button class="review-btn review-btn-known" onclick="reviewKnown()">认识</button>
                 <button class="review-btn review-btn-unfamiliar" onclick="reviewUnfamiliar()">不认识</button>
             </div>
+            <button class="review-btn-exit" onclick="closeReview()">结束复习</button>
+            <div id="reviewDetailLink" style="margin-top: 6px;"></div>
         `;
         loadMistakeWords();
     }
 
     // ---- 原有移除功能 ----
     async function removeWord(wordId, wordContent) {
-        if (!confirm(`确定要从生词本中移除"${wordContent}"吗？`)) {
+        if (!confirm(`确定要从生词本中移除"${wordContent}"吗？\n若移除将认为您已经熟悉该单词`)) {
             return;
         }
 
@@ -464,6 +510,100 @@
                 <p>${message}</p>
             </div>
         `;
+    }
+
+    // ---- 单词详情功能 ----
+    async function showDetail(wordId) {
+        try {
+            const resp = await fetch(`/api/words/get?wordId=${wordId}&userId=${currentUser.userId}`);
+            const result = await resp.json();
+            if (result.code !== 200 || !result.data) { alert('获取详情失败'); return; }
+            const word = result.data;
+
+            document.getElementById('detailWordTitle').textContent = word.content;
+            document.getElementById('detailPhonetic').textContent = word.phonetic || '';
+
+            let detailHTML = `
+                <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="font-size: 14px; color: #666; margin-bottom: 5px;">词性</div>
+                    <div style="font-size: 18px; color: #333;">${getPartOfSpeechText(word.partOfSpeech)}</div>
+                </div>
+                <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="font-size: 14px; color: #666; margin-bottom: 5px;">释义</div>
+                    <div style="font-size: 18px; color: #333; line-height: 1.6;">${word.translation}</div>
+                </div>
+                <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="font-size: 14px; color: #666; margin-bottom: 5px;">发音</div>
+                    <div style="font-size: 18px; color: #333; font-style: italic;">${word.phonetic || '暂无'}</div>
+                </div>
+                <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="font-size: 14px; color: #666; margin-bottom: 5px;">熟悉度</div>
+                    <div style="background: #e0e0e0; border-radius: 10px; height: 20px; overflow: hidden;">
+                        <div style="background: linear-gradient(to right, #667eea, #764ba2); height: 100%; width: ${Math.min(Math.round(word.familiarity), 100)}%; transition: width 0.3s;"></div>
+                    </div>
+                    <div style="text-align: center; margin-top: 5px; color: #667eea; font-weight: bold;">${Math.min(Math.round(word.familiarity), 100)}%</div>
+                </div>
+            `;
+
+            // 如果有短语，显示短语
+            if (word.phrases) {
+                try {
+                    const phrases = JSON.parse(word.phrases);
+                    if (phrases && phrases.length > 0) {
+                        detailHTML += `<div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                            <div style="font-size: 14px; color: #666; margin-bottom: 10px; font-weight: bold;">📝 常用短语（${phrases.length}个）</div>`;
+                        phrases.forEach((p, i) => {
+                            detailHTML += `<div style="padding: 10px; margin-bottom: 8px; background: white; border-radius: 6px; border-left: 3px solid #667eea;">
+                                <div style="font-size: 16px; color: #333;">${i + 1}. ${p.phrase || p}</div>
+                                ${p.translation ? `<div style="font-size: 14px; color: #666;">${p.translation}</div>` : ''}
+                            </div>`;
+                        });
+                        detailHTML += `</div>`;
+                    }
+                } catch(e) {}
+            }
+
+            // 如果有例句，显示例句
+            if (word.sentences) {
+                try {
+                    const sentences = JSON.parse(word.sentences);
+                    if (sentences && sentences.length > 0) {
+                        detailHTML += `<div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                            <div style="font-size: 14px; color: #666; margin-bottom: 10px; font-weight: bold;">💬 例句（${sentences.length}个）</div>`;
+                        sentences.forEach((s, i) => {
+                            detailHTML += `<div style="padding: 10px; margin-bottom: 8px; background: white; border-radius: 6px; border-left: 3px solid #764ba2;">
+                                <div style="font-size: 16px; color: #333;">${i + 1}. ${s.sentence || s}</div>
+                                ${s.translation ? `<div style="font-size: 14px; color: #666;">${s.translation}</div>` : ''}
+                            </div>`;
+                        });
+                        detailHTML += `</div>`;
+                    }
+                } catch(e) {}
+            }
+
+            document.getElementById('detailContent').innerHTML = detailHTML;
+            document.getElementById('detailModal').style.display = 'flex';
+        } catch (e) {
+            console.error(e);
+            alert('网络错误');
+        }
+    }
+
+    function closeDetailModal() {
+        document.getElementById('detailModal').style.display = 'none';
+    }
+
+    function getPartOfSpeechText(pos) {
+        if (!pos) return '';
+        const texts = {
+            'NOUN': 'NOUN（名词）', 'VERB': 'VERB（动词）', 'ADJECTIVE': 'ADJECTIVE（形容词）',
+            'ADVERB': 'ADVERB（副词）', 'PREPOSITION': 'PREPOSITION（介词）', 'CONJUNCTION': 'CONJUNCTION（连词）',
+            'PRONOUN': 'PRONOUN（代词）', 'INTERJECTION': 'INTERJECTION（感叹词）',
+            'ARTICLE': 'ARTICLE（冠词）', 'ABBREVIATION': 'ABBREVIATION（缩写）',
+            'AUXILIARY': 'AUXILIARY（助动词）', 'NUMERAL': 'NUMERAL（数词）', 'MODAL VERB': 'MODAL VERB（情态动词）'
+        };
+        if (pos.includes('/')) return pos.split('/').map(p => texts[p.trim()] || p).join('/');
+        return texts[pos] || pos;
     }
 </script>
 </body>

@@ -432,7 +432,7 @@
                 </div>
                 <button class="search-btn" onclick="startStudyMode()" style="background: #4caf50;">🚀 开始学习</button>
             </div>
-            <p style="color: #999; font-size: 13px; margin-top: 10px;">💡 提示：学习模式将展示熟悉度 ≤70 的单词，帮助你重点复习</p>
+            <p style="color: #999; font-size: 13px; margin-top: 10px;">💡 提示：学习模式将展示熟悉度 ≤60 的单词，帮助你重点复习</p>
         </div>
     </div>
 
@@ -645,7 +645,7 @@
     </div>
 
     <!-- 单词详情对话框 -->
-    <div id="detailModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+    <div id="detailModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 3000; justify-content: center; align-items: center;">
         <div style="background: white; border-radius: 15px; max-width: 600px; width: 90%; display: flex; flex-direction: column; max-height: 80vh;">
             <div style="padding: 20px 30px 0 30px; flex-shrink: 0;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -1367,6 +1367,13 @@
 
     // 显示单词详情
     async function showDetail(wordId, userId) {
+        // 如果没有传入 userId，从 localStorage 获取
+        if (!userId) {
+            try {
+                const user = JSON.parse(localStorage.getItem('currentUser'));
+                if (user) userId = user.userId;
+            } catch(e) {}
+        }
         try {
             const url = userId ? `/api/words/get?wordId=${wordId}&userId=${userId}` : `/api/words/get?wordId=${wordId}`;
             const response = await fetch(url);
@@ -1415,9 +1422,9 @@
                     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                         <div style="font-size: 14px; color: #666; margin-bottom: 5px;">熟悉度</div>
                         <div style="background: #e0e0e0; border-radius: 10px; height: 20px; overflow: hidden;">
-                            <div style="background: linear-gradient(to right, #667eea, #764ba2); height: 100%; width: ${word.familiarity}%; transition: width 0.3s;"></div>
+                            <div style="background: linear-gradient(to right, #667eea, #764ba2); height: 100%; width: ${Math.min(Math.round(word.familiarity), 100)}%; transition: width 0.3s;"></div>
                         </div>
-                        <div style="text-align: center; margin-top: 5px; color: #667eea; font-weight: bold;">${Math.round(word.familiarity)}%</div>
+                        <div style="text-align: center; margin-top: 5px; color: #667eea; font-weight: bold;">${Math.min(Math.round(word.familiarity), 100)}%</div>
                     </div>
                     ` : ''}
                 `;
@@ -1659,7 +1666,7 @@
                 studyWords = result.data || [];
                 
                 if (studyWords.length === 0) {
-                    alert('🎉 太棒了！当前词汇域中没有需要学习的单词（所有单词熟悉度都 >70）');
+                    alert('🎉 太棒了！当前词汇域中没有需要学习的单词（所有单词有效熟悉度都 >60）');
                     return;
                 }
 
@@ -1707,7 +1714,10 @@
                     <button onclick="handleStudyFeedback('${word.wordId}', 'mastered')" style="padding: 15px; background: #2196f3; color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 16px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">🎯 已掌握</button>
                 </div>
                 
-                <button onclick="closeStudyModal()" style="margin-top: 20px; padding: 10px 30px; background: #f0f0f0; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">退出学习</button>
+                <div style="margin-top: 20px;">
+                    <button onclick="showDetail('${word.wordId}', currentUserForStudy?.userId)" style="background: none; border: none; color: #999; font-size: 13px; cursor: pointer; text-decoration: underline; padding: 4px 12px;">🤔 不太记得了？去看看单词详情</button>
+                </div>
+                <button onclick="closeStudyModal()" style="margin-top: 10px; padding: 10px 30px; background: #f0f0f0; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">退出学习</button>
             </div>
         `;
         
@@ -1733,13 +1743,13 @@
                 let message = '';
                 switch(action) {
                     case 'familiar':
-                        message = '✅ 熟悉度已设为 90%';
+                        message = '✅ 熟悉度已提升';
                         break;
                     case 'vague':
-                        message = '👍 熟悉度已调整';
+                        message = '👍 熟悉度已调整（×0.58）';
                         break;
                     case 'unfamiliar':
-                        message = '📕 已加入生词本';
+                        message = '📕 熟悉度下降，已加入生词本';
                         break;
                     case 'mastered':
                         message = '🎉 太棒了！已标记为掌握';

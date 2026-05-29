@@ -19,6 +19,9 @@ public class InteractionService {
     @Autowired
     private UserWordFamiliarityRepository familiarityRepository;
 
+    @Autowired
+    private WordService wordService;
+
     /**
      * 记录一次交互并更新熟悉度
      * @param userId 用户ID
@@ -37,15 +40,15 @@ public class InteractionService {
                 .orElse(new UserWordFamiliarity(userId, wordId, 50, now)); // 初始熟悉度50
 
         int oldF = familiarity.getFamiliarity();
-        // 增量规则：known +10, unknown -15 (范围0~100)
-        int delta = "known".equals(feedback) ? 10 : -15;
-        int newF = Math.max(0, Math.min(100, oldF + delta));
-
-        // 3. 时间衰减：如果距上次交互超过24小时，额外减2
-        Long lastTimestamp = interactionRepository.findLastTimestampByUserAndWord(userId, wordId)
-                .orElse(null);
-        if (lastTimestamp != null && (now - lastTimestamp) > 86400000L) {
-            newF = Math.max(0, newF - 2);
+        Long lastUpdate = familiarity.getLastUpdate();
+        // 先对存储的熟悉度施加时间衰减，使衰减效果持久化
+        int decayedBase = wordService.applyDecay(oldF, lastUpdate);
+        // 答对×2，答错×0.58 (范围0~230)
+        int newF;
+        if ("known".equals(feedback)) {
+            newF = Math.min(230, decayedBase * 2);
+        } else {
+            newF = (int) (decayedBase * 0.58);
         }
 
         familiarity.setFamiliarity(newF);

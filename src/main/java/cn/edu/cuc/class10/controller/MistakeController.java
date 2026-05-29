@@ -1,12 +1,15 @@
 package cn.edu.cuc.class10.controller;
 
+import cn.edu.cuc.class10.entity.Interaction;
 import cn.edu.cuc.class10.entity.MistakeWord;
 import cn.edu.cuc.class10.entity.Word;
 import cn.edu.cuc.class10.entity.UserWordFamiliarity;
+import cn.edu.cuc.class10.repository.InteractionRepository;
 import cn.edu.cuc.class10.repository.MistakeWordRepository;
 import cn.edu.cuc.class10.repository.UserWordFamiliarityRepository;
 import cn.edu.cuc.class10.repository.WordRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -24,6 +27,9 @@ public class MistakeController {
 
     @Autowired
     private UserWordFamiliarityRepository familiarityRepository;
+
+    @Autowired
+    private InteractionRepository interactionRepository;
 
     /**
      * 获取用户的生词本列表
@@ -100,25 +106,39 @@ public class MistakeController {
     }
 
     /**
-     * 从生词本移除单词
+     * 从生词本移除单词（熟悉度设为 max(当前,70)）
      */
+    @Transactional(rollbackFor = Exception.class)
     @PostMapping("/remove")
     public Map<String, Object> remove(@RequestBody Map<String, String> payload) {
         Map<String, Object> result = new HashMap<>();
         try {
             String userId = payload.get("userId");
             String wordId = payload.get("wordId");
-            
+
             if (userId == null || wordId == null) {
                 result.put("code", 400);
                 result.put("message", "参数缺失");
                 return result;
             }
-            
+
             mistakeWordRepository.deleteByUserIdAndWordId(userId, wordId);
-            
+
+            // 熟悉度设为 max(衰减后当前, 70)
+            UserWordFamiliarity uf = familiarityRepository.findByUserIdAndWordId(userId, wordId)
+                    .orElse(new UserWordFamiliarity(userId, wordId, 70, System.currentTimeMillis()));
+            int decayed = applyDecay(uf.getFamiliarity(), uf.getLastUpdate());
+            int newFam = Math.max(decayed, 70);
+            uf.setFamiliarity(newFam);
+            uf.setLastUpdate(System.currentTimeMillis());
+            familiarityRepository.save(uf);
+
+            // 记录交互（用于时间衰减计算）
+            interactionRepository.save(new Interaction(userId, wordId, "remove", System.currentTimeMillis()));
+
             result.put("code", 200);
             result.put("message", "已从生词本移除");
+            result.put("newFamiliarity", newFam);
         } catch (Exception e) {
             result.put("code", 500);
             result.put("message", e.getMessage());
@@ -148,11 +168,13 @@ public class MistakeController {
                     item.put("partOfSpeech", word.getPartOfSpeech());
                 });
 
-                // 获取用户对该词的熟悉度
-                int familiarity = familiarityRepository.findByUserIdAndWordId(userId, mistake.getWordId())
+                // 获取用户对该词的有效熟悉度（含时间衰减）
+                int storedFam = familiarityRepository.findByUserIdAndWordId(userId, mistake.getWordId())
                         .map(UserWordFamiliarity::getFamiliarity)
                         .orElse(50);
-                item.put("familiarity", familiarity);
+                Long lastTime = interactionRepository.findLastTimestampByUserAndWord(userId, mistake.getWordId())
+                        .orElse(null);
+                item.put("familiarity", applyDecay(storedFam, lastTime));
 
                 data.add(item);
             }
@@ -169,6 +191,7 @@ public class MistakeController {
     /**
      * 复习时标记单词为"已认识"：移出生词本，熟悉度设为 max(当前, 70)
      */
+    @Transactional(rollbackFor = Exception.class)
     @PostMapping("/review/known")
     public Map<String, Object> markKnown(@RequestBody Map<String, String> payload) {
         Map<String, Object> result = new HashMap<>();
@@ -184,13 +207,17 @@ public class MistakeController {
             // 移出生词本
             mistakeWordRepository.deleteByUserIdAndWordId(userId, wordId);
 
-            // 熟悉度设为 max(当前, 70)
+            // 熟悉度设为 max(70, 衰减后当前×2)，上限230
             UserWordFamiliarity uf = familiarityRepository.findByUserIdAndWordId(userId, wordId)
                     .orElse(new UserWordFamiliarity(userId, wordId, 70, System.currentTimeMillis()));
-            int newFam = Math.max(uf.getFamiliarity(), 70);
+            int decayed = applyDecay(uf.getFamiliarity(), uf.getLastUpdate());
+            int newFam = Math.min(230, Math.max(70, decayed * 2));
             uf.setFamiliarity(newFam);
             uf.setLastUpdate(System.currentTimeMillis());
             familiarityRepository.save(uf);
+
+            // 记录交互（用于时间衰减计算）
+            interactionRepository.save(new Interaction(userId, wordId, "review_known", System.currentTimeMillis()));
 
             result.put("code", 200);
             result.put("newFamiliarity", newFam);
@@ -202,8 +229,9 @@ public class MistakeController {
     }
 
     /**
-     * 复习时标记单词为"不认识"：仅记录复习次数，留在生词本
+     * 复习时标记单词为"不认识"：降低熟悉度（-5），留在生词本
      */
+    @Transactional(rollbackFor = Exception.class)
     @PostMapping("/review/unfamiliar")
     public Map<String, Object> markUnfamiliar(@RequestBody Map<String, String> payload) {
         Map<String, Object> result = new HashMap<>();
@@ -223,12 +251,41 @@ public class MistakeController {
                 mistakeWordRepository.save(mw);
             });
 
+            // 降低熟悉度（衰减后当前-5，最低0）
+            UserWordFamiliarity uf = familiarityRepository.findByUserIdAndWordId(userId, wordId)
+                    .orElse(new UserWordFamiliarity(userId, wordId, 50, System.currentTimeMillis()));
+            int decayed = applyDecay(uf.getFamiliarity(), uf.getLastUpdate());
+            int newFam = Math.max(0, decayed - 5);
+            uf.setFamiliarity(newFam);
+            uf.setLastUpdate(System.currentTimeMillis());
+            familiarityRepository.save(uf);
+
+            // 记录交互（用于时间衰减计算）
+            interactionRepository.save(new Interaction(userId, wordId, "review_unfamiliar", System.currentTimeMillis()));
+
             result.put("code", 200);
+            result.put("newFamiliarity", newFam);
         } catch (Exception e) {
             result.put("code", 500);
             result.put("message", e.getMessage());
         }
         return result;
+    }
+
+    /**
+     * 艾宾浩斯遗忘曲线衰减：≥2天 ×0.33，≥4天再×0.83，≥7天再×0.92
+     */
+    private int applyDecay(int storedFamiliarity, Long lastInteractionTime) {
+        if (lastInteractionTime == null || storedFamiliarity <= 0) return storedFamiliarity;
+        long days = (System.currentTimeMillis() - lastInteractionTime) / 86400000L;
+        if (days >= 7) {
+            return (int)(storedFamiliarity * 0.33 * 0.83 * 0.92);
+        } else if (days >= 4) {
+            return (int)(storedFamiliarity * 0.33 * 0.83);
+        } else if (days >= 2) {
+            return (int)(storedFamiliarity * 0.33);
+        }
+        return storedFamiliarity;
     }
 
     /**

@@ -1,7 +1,9 @@
 package cn.edu.cuc.class10.controller;
 
+import cn.edu.cuc.class10.entity.Interaction;
 import cn.edu.cuc.class10.entity.Word;
 import cn.edu.cuc.class10.entity.WordType;
+import cn.edu.cuc.class10.repository.InteractionRepository;
 import cn.edu.cuc.class10.service.WordService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +18,9 @@ public class WordController {
 
     @Autowired
     private WordService wordService;
+
+    @Autowired
+    private InteractionRepository interactionRepository;
 
     @GetMapping("/add")
     public Map<String, Object> addWord(
@@ -145,7 +150,7 @@ public class WordController {
             data.put("similarMeanings", word.getSimilarMeanings());
             data.put("similarSpellings", word.getSimilarSpellings());
             data.put("familiarity",
-                    userId != null ? wordService.getUserFamiliarity(userId, wordId) : 50);
+                    userId != null ? wordService.getEffectiveFamiliarity(userId, wordId) : 50);
 
             result.put("code", 200);
             result.put("message", "查询成功");
@@ -281,29 +286,34 @@ public class WordController {
                 return result;
             }
 
-            int newFamiliarity = 50; // 默认值
+            int currentFam = wordService.getDecayedBaselineFamiliarity(userId, wordId);
+            int newFamiliarity = currentFam;
             boolean addToMistakeBook = false;
+            String interactionFeedback = action;
 
             switch (action) {
                 case "familiar":
-                    newFamiliarity = 90;
+                    newFamiliarity = Math.min(currentFam * 2, 230);
                     break;
                 case "vague":
-                    // 获取当前用户对该词的熟悉度，改为80%
-                    int currentFam = wordService.getUserFamiliarity(userId, wordId);
-                    newFamiliarity = (int) (currentFam * 0.8);
+                    newFamiliarity = (int) (currentFam * 0.58);
                     break;
                 case "unfamiliar":
-                    newFamiliarity = 30;
+                    newFamiliarity = (int) (currentFam * 0.33);
                     addToMistakeBook = true;
                     break;
                 case "mastered":
-                    newFamiliarity = 100;
+                    newFamiliarity = 230;
                     break;
                 default:
                     result.put("code", 400);
                     result.put("message", "无效的操作类型");
                     return result;
+            }
+
+            // 记录交互（用于时间衰减计算）
+            if (userId != null) {
+                interactionRepository.save(new Interaction(userId, wordId, "study_" + interactionFeedback, System.currentTimeMillis()));
             }
 
             // 更新熟悉度（写入 user_word_familiarity 表，按用户隔离）

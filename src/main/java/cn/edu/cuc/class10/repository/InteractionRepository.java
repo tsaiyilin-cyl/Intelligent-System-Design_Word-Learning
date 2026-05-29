@@ -20,6 +20,9 @@ public interface InteractionRepository extends JpaRepository<Interaction, String
     @Query("SELECT MAX(i.timestamp) FROM Interaction i WHERE i.userId = :userId AND i.wordId = :wordId")
     Optional<Long> findLastTimestampByUserAndWord(@Param("userId") String userId, @Param("wordId") String wordId);
 
+    @Query("SELECT i.wordId, MAX(i.timestamp) FROM Interaction i WHERE i.userId = :userId GROUP BY i.wordId")
+    List<Object[]> findLastTimestampByUser(@Param("userId") String userId);
+
     /**
      * 统计指定用户每个单词的错误次数（feedback='unknown'），按错误次数降序返回
      * @param userId 用户ID
