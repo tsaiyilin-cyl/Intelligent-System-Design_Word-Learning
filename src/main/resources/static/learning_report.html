@@ -181,6 +181,7 @@
             white-space: nowrap;
         }
         .wordlist-item-fam.high { background: #e8f5e9; color: #2e7d32; }
+        .wordlist-item-fam.mid { background: #fff3e0; color: #e65100; }
         .wordlist-item-fam.low { background: #fce4ec; color: #c62828; }
 
         @media (max-width: 768px) {
@@ -197,8 +198,8 @@
     <div class="header">
         <h1>📊 学习报告</h1>
         <div class="nav-buttons">
-            <a href="study.html">单词学习</a>
-            <a href="test.html">单词测试</a>
+            <a href="dashboard.html">单词学习</a>
+            <a href="dashboard.html">单词测试</a>
             <a href="dashboard.html">返回首页</a>
         </div>
     </div>
@@ -217,6 +218,7 @@
         </div>
         <div class="wordlist-tabs" id="wordlistTabs">
             <button class="wordlist-tab" onclick="switchWordList('all')">全部</button>
+            <button class="wordlist-tab" onclick="switchWordList('learned')">已学习</button>
             <button class="wordlist-tab" onclick="switchWordList('mastered')">已掌握</button>
             <button class="wordlist-tab" onclick="switchWordList('unmastered')">未掌握</button>
         </div>
@@ -281,7 +283,7 @@
     async function showWordList(filter) {
         currentWordListFilter = filter;
         document.getElementById('wordlistOverlay').classList.add('show');
-        document.getElementById('wordlistTitle').textContent = filter === 'mastered' ? '已掌握词汇' : '词汇列表';
+        document.getElementById('wordlistTitle').textContent = filter === 'mastered' ? '已掌握词汇' : (filter === 'learned' ? '已学习词汇' : '词汇列表');
         updateWordListTabs();
         await loadWordList();
     }
@@ -291,14 +293,14 @@
             tab.classList.remove('active');
         });
         const tabs = document.querySelectorAll('.wordlist-tab');
-        const filterMap = { 'all': 0, 'mastered': 1, 'unmastered': 2 };
+        const filterMap = { 'all': 0, 'learned': 1, 'mastered': 2, 'unmastered': 3 };
         const idx = filterMap[currentWordListFilter] || 0;
         if (tabs[idx]) tabs[idx].classList.add('active');
     }
 
     async function switchWordList(filter) {
         currentWordListFilter = filter;
-        document.getElementById('wordlistTitle').textContent = filter === 'mastered' ? '已掌握词汇' : '词汇列表';
+        document.getElementById('wordlistTitle').textContent = filter === 'mastered' ? '已掌握词汇' : (filter === 'learned' ? '已学习词汇' : '词汇列表');
         updateWordListTabs();
         document.getElementById('wordlistBody').innerHTML = '<div class="loading">加载中...</div>';
         await loadWordList();
@@ -323,7 +325,7 @@
                         <div class="wordlist-item-content">${w.content}</div>
                         <div class="wordlist-item-trans">${w.translation}</div>
                     </div>
-                    <span class="wordlist-item-fam ${Math.min(Math.round(w.familiarity), 100) >= 60 ? 'high' : 'low'}">${Math.min(Math.round(w.familiarity), 100)}%</span>
+                    <span class="wordlist-item-fam ${Math.min(Math.round(w.familiarity), 100) >= 80 ? 'high' : (Math.min(Math.round(w.familiarity), 100) >= 60 ? 'mid' : 'low')}">${Math.min(Math.round(w.familiarity), 100)}%</span>
                 </div>
             `).join('');
         } catch(e) {

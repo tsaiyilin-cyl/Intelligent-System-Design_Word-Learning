@@ -6,6 +6,7 @@ import cn.edu.cuc.class10.entity.WordType;
 import cn.edu.cuc.class10.repository.InteractionRepository;
 import cn.edu.cuc.class10.service.WordService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -176,13 +177,14 @@ public class WordController {
     }
 
     @GetMapping("/all/ordered")
-    public Map<String, Object> getAllWordsOrdered() {
+    public Map<String, Object> getAllWordsOrdered(
+            @RequestParam(required = false) String userId) {
         Map<String, Object> result = new HashMap<>();
 
-        List<Word> words = wordService.getAllWordsOrderByContent();
+        List<Map<String, Object>> data = wordService.getAllWordsWithFamiliarity(userId);
         result.put("code", 200);
         result.put("message", "查询成功（按字典序）");
-        result.put("data", words);
+        result.put("data", data);
 
         return result;
     }
@@ -210,15 +212,17 @@ public class WordController {
     }
 
     @GetMapping("/search")
-    public Map<String, Object> searchWords(@RequestParam String keyword) {
+    public Map<String, Object> searchWords(
+            @RequestParam String keyword,
+            @RequestParam(required = false) String userId) {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            List<Word> words = wordService.searchWords(keyword);
+            List<Map<String, Object>> data = wordService.searchWordsWithFamiliarity(keyword, userId);
 
             result.put("code", 200);
             result.put("message", "查询成功");
-            result.put("data", words);
+            result.put("data", data);
         } catch (Exception e) {
             result.put("code", 400);
             result.put("message", e.getMessage());
@@ -272,6 +276,7 @@ public class WordController {
     /**
      * 更新单词熟悉度（学习反馈）
      */
+    @Transactional(rollbackFor = Exception.class)
     @PostMapping("/study/updateFamiliarity")
     public Map<String, Object> updateStudyFamiliarity(@RequestBody Map<String, Object> payload) {
         Map<String, Object> result = new HashMap<>();

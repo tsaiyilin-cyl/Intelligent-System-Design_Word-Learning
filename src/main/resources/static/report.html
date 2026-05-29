@@ -232,7 +232,7 @@
                 <h2>无法显示结果</h2>
                 <div class="error-message">${message}</div>
                 <div class="buttons">
-                    <a href="test.html" class="btn btn-primary">去测试</a>
+                    <a href="dashboard.html" class="btn btn-primary">去测试</a>
                     <a href="dashboard.html" class="btn btn-secondary">返回首页</a>
                 </div>
             `;
@@ -313,16 +313,21 @@
                 html += `<p style="margin-top:16px; color:#999;">暂无答题详情记录</p>`;
             }
 
-            // 根据来源页面决定返回按钮的文字
-            let returnButtonText = '返回首页';
+            // 根据来源页面决定返回按钮
+            let primaryBtn = '<a href="dashboard.html" class="btn btn-primary">再次测试</a>';
+            let secondaryBtn = '<a href="dashboard.html" class="btn btn-secondary">返回首页</a>';
             if (fromPage === 'learning_report') {
-                returnButtonText = '返回学习报告';
+                primaryBtn = '<a href="dashboard.html?view=report" class="btn btn-primary">返回学习报告</a>';
+                secondaryBtn = '<a href="dashboard.html" class="btn btn-secondary">返回首页</a>';
+            } else if (fromPage === 'test') {
+                primaryBtn = '<a href="dashboard.html?view=test" class="btn btn-primary">继续测试</a>';
+                secondaryBtn = '<a href="dashboard.html" class="btn btn-secondary">返回首页</a>';
             }
-            
+
             html += `
                 <div class="buttons">
-                    <a href="test.html" class="btn btn-primary">再次测试</a>
-                    <a href="${fromPage}.html" class="btn btn-secondary">${returnButtonText}</a>
+                    ${primaryBtn}
+                    ${secondaryBtn}
                 </div>
             `;
             if (!isHistoryMode) {

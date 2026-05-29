@@ -121,16 +121,90 @@ public class WordService {
         return wordRepository.findAllOrderByContentAsc();
     }
 
+    /**
+     * 获取所有单词（按字典序），如果提供了 userId 则包含熟悉度
+     */
+    public List<java.util.Map<String, Object>> getAllWordsWithFamiliarity(String userId) {
+        List<Word> words = wordRepository.findAllOrderByContentAsc();
+        return attachFamiliarityToWords(words, userId);
+    }
+
     public List<Word> getWordsByType(WordType wordType) {
         return wordRepository.findByWordType(wordType);
     }
 
     public List<Word> getWordsByPhase(String phase) {
-        return wordRepository.findByContentContainingIgnoreCase(phase);
+        return wordRepository.findAll().stream()
+                .filter(w -> phase == null || phase.equals(w.getPhase()))
+                .collect(Collectors.toList());
     }
 
     public List<Word> searchWords(String keyword) {
         return wordRepository.searchByKeyword(keyword);
+    }
+
+    /**
+     * 搜索单词（含熟悉度）
+     */
+    public List<java.util.Map<String, Object>> searchWordsWithFamiliarity(String keyword, String userId) {
+        List<Word> words = wordRepository.searchByKeyword(keyword);
+        return attachFamiliarityToWords(words, userId);
+    }
+
+    /**
+     * 给单词列表附加熟悉度（批量加载避免 N+1）
+     */
+    private List<java.util.Map<String, Object>> attachFamiliarityToWords(List<Word> words, String userId) {
+        if (userId == null) {
+            // 不传 userId 则返回原始 Word 列表（不含熟悉度）
+            return words.stream().map(w -> {
+                java.util.Map<String, Object> item = new java.util.HashMap<>();
+                item.put("wordId", w.getWordId());
+                item.put("content", w.getContent());
+                item.put("translation", w.getTranslation());
+                item.put("partOfSpeech", w.getPartOfSpeech());
+                item.put("phonetic", w.getPhonetic());
+                item.put("wordType", w.getWordType());
+                item.put("phase", w.getPhase());
+                return item;
+            }).collect(Collectors.toList());
+        }
+
+        // 加载该用户的所有熟悉度记录
+        java.util.Map<String, Integer> familiarityMap = familiarityRepository.findByUserId(userId)
+                .stream()
+                .collect(Collectors.toMap(
+                        UserWordFamiliarity::getWordId,
+                        UserWordFamiliarity::getFamiliarity,
+                        (v1, v2) -> v1
+                ));
+
+        // 加载所有最后交互时间
+        java.util.Map<String, Long> lastInteractionMap = interactionRepository.findLastTimestampByUser(userId)
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> (String) ((Object[]) row)[0],
+                        row -> (Long) ((Object[]) row)[1]
+                ));
+
+        return words.stream().map(word -> {
+            java.util.Map<String, Object> item = new java.util.HashMap<>();
+            item.put("wordId", word.getWordId());
+            item.put("content", word.getContent());
+            item.put("translation", word.getTranslation());
+            item.put("partOfSpeech", word.getPartOfSpeech());
+            item.put("phonetic", word.getPhonetic());
+            item.put("wordType", word.getWordType());
+            item.put("phase", word.getPhase());
+            item.put("phrases", word.getPhrases());
+            item.put("sentences", word.getSentences());
+            item.put("similarMeanings", word.getSimilarMeanings());
+            item.put("similarSpellings", word.getSimilarSpellings());
+            int stored = familiarityMap.getOrDefault(word.getWordId(), 50);
+            Long lastTime = lastInteractionMap.get(word.getWordId());
+            item.put("familiarity", applyDecay(stored, lastTime));
+            return item;
+        }).collect(Collectors.toList());
     }
 
     public void addSimilarMeaning(String wordId, String targetWordId, Double similarityScore) {

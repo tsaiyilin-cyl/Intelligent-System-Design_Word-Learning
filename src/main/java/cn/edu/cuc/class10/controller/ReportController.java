@@ -34,6 +34,23 @@ public class ReportController {
      * 获取单词列表（供报告详情查看）
      * filter: all | mastered | unmastered
      */
+    /**
+     * 获取学习计划实时数据
+     */
+    @GetMapping("/studyPlan")
+    public Map<String, Object> getStudyPlan(@RequestParam String userId) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            Map<String, Object> data = reportService.getStudyPlanData(userId);
+            result.put("code", 200);
+            result.put("data", data);
+        } catch (Exception e) {
+            result.put("code", 500);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
+
     @GetMapping("/wordList")
     public Map<String, Object> getWordList(
             @RequestParam String userId,

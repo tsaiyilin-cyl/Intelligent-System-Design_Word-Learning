@@ -86,6 +86,7 @@
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             text-align: center;
             transition: transform 0.2s;
+            cursor: pointer;
         }
 
         .stat-card:hover {
@@ -182,6 +183,49 @@
             color: #666;
             font-size: 14px;
         }
+
+        /* 词汇列表弹窗 */
+        .wordlist-overlay {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.4); z-index:2000;
+            display:flex; align-items:center; justify-content:center;
+            opacity:0; pointer-events:none; transition:opacity 0.25s;
+        }
+        .wordlist-overlay.show { opacity:1; pointer-events:auto; }
+        .wordlist-modal {
+            background: #fff; border-radius:16px; width:90%; max-width:560px;
+            max-height:80vh; display:flex; flex-direction:column; box-shadow:0 8px 30px rgba(0,0,0,0.2);
+        }
+        .wordlist-header {
+            display:flex; justify-content:space-between; align-items:center;
+            padding:18px 24px; border-bottom:1px solid #eee;
+        }
+        .wordlist-header h2 { font-size:18px; color:#333; }
+        .wordlist-close {
+            background:#f0f0f0; border:none; padding:8px 18px; border-radius:8px; cursor:pointer; color:#666; font-size:14px;
+        }
+        .wordlist-tabs {
+            display:flex; gap:6px; padding:12px 24px; border-bottom:1px solid #eee;
+        }
+        .wordlist-tab {
+            padding:6px 16px; border-radius:20px; border:1px solid #d0d5e0;
+            background:#fff; color:#666; cursor:pointer; font-size:13px; transition:all 0.2s;
+        }
+        .wordlist-tab.active { background:#667eea; color:#fff; border-color:#667eea; }
+        .wordlist-body { flex:1; overflow-y:auto; padding:12px 24px 24px; }
+        .wordlist-item {
+            display:flex; justify-content:space-between; align-items:center;
+            padding:12px 0; border-bottom:1px solid #f0f0f0;
+        }
+        .wordlist-item-content { font-size:16px; font-weight:500; color:#333; }
+        .wordlist-item-trans { font-size:13px; color:#909399; margin-top:2px; }
+        .wordlist-item-fam {
+            font-size:13px; font-weight:600; padding:4px 10px; border-radius:20px; flex-shrink:0;
+        }
+        .wordlist-item-fam.high { background: #e8f5e9; color: #2e7d32; }
+        .wordlist-item-fam.mid { background: #fff3e0; color: #e65100; }
+        .wordlist-item-fam.low { background: #fce4ec; color: #c62828; }
+        .loading { text-align:center; padding:30px; color:#909399; }
     </style>
 </head>
 <body>
@@ -200,25 +244,25 @@
         </div>
 
         <div class="stats-grid">
-            <div class="stat-card">
+            <div class="stat-card" style="cursor:default;">
                 <div class="stat-icon">🎯</div>
                 <div class="stat-value" id="dailyGoal">10</div>
                 <div class="stat-label">每日学习目标</div>
             </div>
 
-            <div class="stat-card">
+            <div class="stat-card" onclick="showWordListPopup('learned')">
                 <div class="stat-icon">📖</div>
                 <div class="stat-value" id="totalWords">0</div>
                 <div class="stat-label">已学习单词</div>
             </div>
 
-            <div class="stat-card">
+            <div class="stat-card" onclick="showWordListPopup('mastered')">
                 <div class="stat-icon">✅</div>
                 <div class="stat-value" id="masteredWords">0</div>
                 <div class="stat-label">已掌握单词</div>
             </div>
 
-            <div class="stat-card">
+            <div class="stat-card" style="cursor:default;">
                 <div class="stat-icon">🔥</div>
                 <div class="stat-value" id="studyStreak">0</div>
                 <div class="stat-label">连续学习天数</div>
@@ -227,7 +271,7 @@
 
         <div class="progress-section">
             <h3>📊 学习进度</h3>
-            
+
             <div class="progress-item">
                 <div class="progress-label">
                     <span>今日完成度</span>
@@ -251,7 +295,7 @@
 
         <div class="tips-section">
             <h3>💡 学习建议</h3>
-            
+
             <div class="tip-item">
                 <div class="tip-title">制定合理目标</div>
                 <div class="tip-content">根据您的学习阶段和类型，建议每天学习10-20个新单词，循序渐进。</div>
@@ -274,41 +318,138 @@
         </div>
     </div>
 
+    <!-- 词汇列表弹窗 -->
+    <div class="wordlist-overlay" id="wordlistOverlay" onclick="closeWordListPopup(event)">
+        <div class="wordlist-modal">
+            <div class="wordlist-header">
+                <h2 id="wordlistPopupTitle">词汇列表</h2>
+                <button class="wordlist-close" onclick="closeWordListPopup()">关闭</button>
+            </div>
+            <div class="wordlist-tabs">
+                <button class="wordlist-tab" id="tabAll" onclick="switchWordListPopup('all')">全部</button>
+                <button class="wordlist-tab" id="tabLearned" onclick="switchWordListPopup('learned')">已学习</button>
+                <button class="wordlist-tab" id="tabMastered" onclick="switchWordListPopup('mastered')">已掌握</button>
+                <button class="wordlist-tab" id="tabUnmastered" onclick="switchWordListPopup('unmastered')">未掌握</button>
+            </div>
+            <div class="wordlist-body" id="wordlistBody">
+                <div class="loading">加载中...</div>
+            </div>
+        </div>
+    </div>
+
     <script>
+        let currentUser = null;
+        let currentWordListFilter = 'all';
+
         // 页面加载时获取用户信息
         window.addEventListener('load', function() {
             const userData = localStorage.getItem('currentUser');
-            
+
             if (!userData) {
                 window.location.href = '/login.html';
                 return;
             }
 
-            const user = JSON.parse(userData);
-            document.getElementById('username').textContent = user.username;
+            currentUser = JSON.parse(userData);
+            document.getElementById('username').textContent = currentUser.username;
 
-            // 显示学习计划数据
-            document.getElementById('dailyGoal').textContent = user.dailyGoal || 10;
-            document.getElementById('totalWords').textContent = user.totalWords || 0;
-            document.getElementById('masteredWords').textContent = user.masteredWords || 0;
-            document.getElementById('studyStreak').textContent = user.studyStreak || 0;
-
-            // 计算进度
-            const dailyGoal = user.dailyGoal || 10;
-            const totalWords = user.totalWords || 0;
-            const masteredWords = user.masteredWords || 0;
-
-            // 今日完成度（这里假设一个值，实际应该从后端获取今日学习数量）
-            const todayLearned = Math.min(totalWords % dailyGoal, dailyGoal);
-            const todayPercent = Math.round((todayLearned / dailyGoal) * 100);
-            document.getElementById('todayProgress').textContent = todayPercent + '%';
-            document.getElementById('todayProgressBar').style.width = todayPercent + '%';
-
-            // 掌握率
-            const masteryRate = totalWords > 0 ? Math.round((masteredWords / totalWords) * 100) : 0;
-            document.getElementById('masteryRate').textContent = masteryRate + '%';
-            document.getElementById('masteryProgressBar').style.width = masteryRate + '%';
+            // 从后端加载实时数据
+            loadPlanData();
         });
+
+        async function loadPlanData() {
+            try {
+                const res = await fetch('/api/report/studyPlan?userId=' + currentUser.userId);
+                const data = await res.json();
+                if (data.code === 200 && data.data) {
+                    const d = data.data;
+                    document.getElementById('dailyGoal').textContent = d.dailyGoal || 10;
+                    document.getElementById('totalWords').textContent = d.totalWords || 0;
+                    document.getElementById('masteredWords').textContent = d.masteredWords || 0;
+                    document.getElementById('studyStreak').textContent = d.studyStreak || 0;
+
+                    // 今日完成度
+                    const goal = d.dailyGoal || 10;
+                    const todayLearned = d.todayLearned || 0;
+                    const todayPercent = Math.min(Math.round((todayLearned / goal) * 100), 100);
+                    document.getElementById('todayProgress').textContent = todayPercent + '%';
+                    document.getElementById('todayProgressBar').style.width = todayPercent + '%';
+
+                    // 掌握率
+                    const total = d.totalWords || 0;
+                    const mastered = d.masteredWords || 0;
+                    const masteryRate = total > 0 ? Math.min(Math.round((mastered / total) * 100), 100) : 0;
+                    document.getElementById('masteryRate').textContent = masteryRate + '%';
+                    document.getElementById('masteryProgressBar').style.width = masteryRate + '%';
+                }
+            } catch (e) {
+                console.error('加载学习计划数据失败', e);
+            }
+        }
+
+        // ========== 词汇列表弹窗 ==========
+        function showWordListPopup(filter) {
+            currentWordListFilter = filter;
+            document.getElementById('wordlistPopupTitle').textContent =
+                filter === 'mastered' ? '已掌握词汇' : (filter === 'learned' ? '已学习词汇' : '词汇列表');
+            document.getElementById('wordlistOverlay').classList.add('show');
+            document.getElementById('wordlistBody').innerHTML = '<div class="loading">加载中...</div>';
+            loadWordListPopup();
+            // 更新tab高亮
+            document.querySelectorAll('.wordlist-tab').forEach(t => t.classList.remove('active'));
+            const tabMap = { all: 'tabAll', learned: 'tabLearned', mastered: 'tabMastered', unmastered: 'tabUnmastered' };
+            const activeTab = document.getElementById(tabMap[filter]);
+            if (activeTab) activeTab.classList.add('active');
+        }
+
+        function switchWordListPopup(filter) {
+            currentWordListFilter = filter;
+            document.getElementById('wordlistPopupTitle').textContent =
+                filter === 'mastered' ? '已掌握词汇' : (filter === 'learned' ? '已学习词汇' : '词汇列表');
+            document.getElementById('wordlistBody').innerHTML = '<div class="loading">加载中...</div>';
+            loadWordListPopup();
+            document.querySelectorAll('.wordlist-tab').forEach(t => t.classList.remove('active'));
+            const tabMap = { all: 'tabAll', learned: 'tabLearned', mastered: 'tabMastered', unmastered: 'tabUnmastered' };
+            const activeTab = document.getElementById(tabMap[filter]);
+            if (activeTab) activeTab.classList.add('active');
+        }
+
+        async function loadWordListPopup() {
+            try {
+                const resp = await fetch('/api/report/wordList?userId=' + currentUser.userId + '&filter=' + currentWordListFilter);
+                const data = await resp.json();
+                const body = document.getElementById('wordlistBody');
+                if (data.code === 200 && data.data && data.data.length > 0) {
+                    body.innerHTML = data.data.map(w => {
+                        const fam = Math.min(Math.round(w.familiarity), 100);
+                        const cls = fam >= 80 ? 'high' : (fam >= 60 ? 'mid' : 'low');
+                        return '<div class="wordlist-item">' +
+                            '<div>' +
+                            '<div class="wordlist-item-content">' + escapeHtml(w.content || '') + '</div>' +
+                            '<div class="wordlist-item-trans">' + escapeHtml(w.translation || '') + '</div>' +
+                            '</div>' +
+                            '<span class="wordlist-item-fam ' + cls + '">' + fam + '%</span>' +
+                            '</div>';
+                    }).join('');
+                } else {
+                    body.innerHTML = '<div style="text-align:center;padding:30px;color:#909399;">暂无单词</div>';
+                }
+            } catch(e) {
+                console.error(e);
+                document.getElementById('wordlistBody').innerHTML = '<div style="text-align:center;padding:30px;color:#909399;">加载失败</div>';
+            }
+        }
+
+        function closeWordListPopup(e) {
+            if (e && e.target !== e.currentTarget) return;
+            document.getElementById('wordlistOverlay').classList.remove('show');
+        }
+
+        function escapeHtml(text) {
+            const d = document.createElement('div');
+            d.textContent = text;
+            return d.innerHTML;
+        }
     </script>
 </body>
 </html>
