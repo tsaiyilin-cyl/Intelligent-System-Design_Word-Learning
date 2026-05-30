@@ -3041,6 +3041,7 @@ const app = createApp({
                 if (user.value?.phase === 'non-student') {
                     studyFilter.value = 'CUSTOM';
                 }
+                loadAvatar();
             } catch(e) {
                 window.location.href = '/login.html';
                 return;
