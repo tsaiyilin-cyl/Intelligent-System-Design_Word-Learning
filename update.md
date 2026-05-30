@@ -411,10 +411,4 @@
   - 学习报告页面的"最近生词记录"中移除"复习 {{ mw.reviewCount || 0 }} 次"字样
   - 生词本列表中移除"复习 {{ mw.reviewCount || 0 }} 次"字样
 
-- **修改文件**:
-  - `src/main/java/cn/edu/cuc/class10/service/WordService.java` - isInUserPhase 添加 non-student 分支
-  - `src/main/java/cn/edu/cuc/class10/service/TestService.java` - isPhaseMatch 添加 non-student 分支
-  - `src/main/java/cn/edu/cuc/class10/service/ReportService.java` - isPhaseMatch 添加 non-student 分支
-  - `src/main/resources/static/login.html` - 注册表单学习阶段添加"非学生"选项
-  - `src/main/resources/static/dashboard.html` - 多项前端适配
 
