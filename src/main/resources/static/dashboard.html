@@ -929,7 +929,7 @@
                         <div class="stat-value">{{ dashboardStats.total || '-' }}</div>
                         <div class="stat-icon">📚</div>
                     </div>
-                    <div class="stat-card-el">
+                    <div v-if="user?.phase !== 'non-student'" class="stat-card-el">
                         <div class="stat-accent" style="background:#409eff;"></div>
                         <div class="stat-label">考纲词汇</div>
                         <div class="stat-value">{{ dashboardStats.syllabus || '-' }}</div>
@@ -1033,7 +1033,7 @@
                 <div v-if="searchHasOutOfPhase" style="background:#fff3e0; border:1px solid #ffe0b2; border-radius:10px; padding:12px 16px; margin-bottom:16px; display:flex; align-items:center; gap:10px;">
                     <span style="font-size:18px;">💡</span>
                     <span style="font-size:13px; color:#e65100;">部分搜索结果不属于当前学习阶段（{{
-                        user?.phase === 'primary' ? '小学' : user?.phase === 'junior' ? '初中' : '高中'
+                        user?.phase === 'primary' ? '小学' : user?.phase === 'junior' ? '初中' : user?.phase === 'senior' ? '高中' : '非学生'
                     }}）考纲范围，仅供参考</span>
                 </div>
 
@@ -1074,7 +1074,7 @@
                 <div style="display:flex; justify-content:center; margin-top:20px;" v-if="words.length > pageSize">
                     <el-pagination
                         background
-                        layout="prev, pager, next"
+                        layout="prev, pager, next, jumper"
                         :total="words.length"
                         :page-size="pageSize"
                         v-model:current-page="currentPage"
@@ -1288,7 +1288,6 @@
                                 <span class="ml-word">{{ mw.word?.content || mw.content }}</span>
                                 <span class="ml-trans">{{ mw.word?.translation || mw.translation }}</span>
                             </div>
-                            <span class="ml-count">复习 {{ mw.reviewCount || 0 }} 次</span>
                         </div>
                     </div>
                 </el-card>
@@ -1313,7 +1312,6 @@
                             <span v-if="mw.familiarity !== undefined" class="wordlist-item-fam" :class="mw.familiarity >= 60 ? 'high' : 'low'" style="font-size:12px;">
                                 {{ Math.min(Math.round(mw.familiarity), 100) }}%
                             </span>
-                            <span class="ml-count" style="white-space:nowrap;">复习 {{ mw.reviewCount || 0 }} 次</span>
                             <el-button size="small" type="primary" :icon="MagicStick" @click="startSingleMistakeReview(mw)" round>复习</el-button>
                             <el-button size="small" type="danger" plain @click="removeMistakeWord(mw)" round>移除</el-button>
                         </div>
@@ -1364,7 +1362,7 @@
                     <div style="position:absolute; left:145px; top:50%; transform:translateY(-50%);">
                         <h2 style="font-size:24px; font-weight:700; color:#fff; margin-bottom:10px;">{{ user?.username }}</h2>
                         <div style="display:flex; gap:8px;">
-                            <el-tag :type="user?.phase === 'senior' ? 'warning' : user?.phase === 'junior' ? 'primary' : 'success'" effect="plain" round size="small" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:#fff;">
+                            <el-tag :type="user?.phase === 'senior' ? 'warning' : user?.phase === 'junior' ? 'primary' : user?.phase === 'non-student' ? 'info' : 'success'" effect="plain" round size="small" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:#fff;">
                                 {{ phaseMap[user?.phase] || user?.phase }}
                             </el-tag>
                             <el-tag style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:#fff;" effect="plain" round size="small">
@@ -1603,6 +1601,7 @@
                                         <el-radio-button value="primary" size="default">小学</el-radio-button>
                                         <el-radio-button value="junior" size="default">初中</el-radio-button>
                                         <el-radio-button value="senior" size="default">高中</el-radio-button>
+                                        <el-radio-button value="non-student" size="default">非学生</el-radio-button>
                                     </el-radio-group>
                                 </el-form-item>
                             </el-col>
@@ -1894,7 +1893,7 @@ const app = createApp({
             return user.value?.username?.charAt(0)?.toUpperCase() || 'U';
         });
 
-        const phaseMap = { primary: '小学', junior: '初中', senior: '高中' };
+        const phaseMap = { primary: '小学', junior: '初中', senior: '高中', 'non-student': '非学生' };
 
         // ========== 仪表盘 ==========
         const dashboardStats = reactive({ total: 0, syllabus: 0, custom: 0 });
@@ -2186,6 +2185,7 @@ const app = createApp({
             const uid = user.value?.userId;
             // 按学习阶段过滤：初中包含小学，高中包含初中和小学
             function allowedPhases(userPhase) {
+                if (userPhase === 'non-student') return [];
                 const order = ['primary', 'junior', 'senior'];
                 const idx = order.indexOf(userPhase);
                 return idx >= 0 ? order.slice(0, idx + 1) : null;
@@ -3038,6 +3038,9 @@ const app = createApp({
             }
             try {
                 user.value = JSON.parse(stored);
+                if (user.value?.phase === 'non-student') {
+                    studyFilter.value = 'CUSTOM';
+                }
             } catch(e) {
                 window.location.href = '/login.html';
                 return;

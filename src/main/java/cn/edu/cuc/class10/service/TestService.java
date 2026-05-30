@@ -132,6 +132,7 @@ public class TestService {
     private boolean isPhaseMatch(String wordPhase, String userPhase) {
         if (wordPhase == null) return true;
         switch (userPhase) {
+            case "non-student": return false;
             case "primary": return "primary".equals(wordPhase);
             case "junior": return "primary".equals(wordPhase) || "junior".equals(wordPhase);
             case "senior": return true;

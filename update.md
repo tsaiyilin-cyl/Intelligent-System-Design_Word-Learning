@@ -383,3 +383,38 @@
   - 注册页（register.html）和个人中心（profile.html）的"学习类型"下拉选项直接显示类型说明
   - 刷题型 → "刷题型 - 偏好快速检验、大量刷词测试的学习者"
   - 记忆型 → "记忆型 - 偏好深度加工、重复多遍的学习者"
+
+## 2026-05-30
+
+### 学习阶段新增"非学生"、单词列表分页增加跳转功能、移除生词"已复习x次"显示
+- **成员**: 蔡奕麟
+- **审查**: 蔡奕麟
+- **工作内容:**
+
+  **学习阶段新增"非学生"**：
+  - 登录注册页学习阶段下拉框新增"非学生（Non-student）"选项
+  - 个人中心编辑资料的学习阶段选择新增"非学生"选项
+  - 后端 phase 过滤逻辑统一处理：非学生用户不匹配任何考纲词汇，只能使用自建词汇
+    - WordService.isInUserPhase() 添加 non-student 分支返回 false
+    - TestService.isPhaseMatch() 添加 non-student 分支返回 false
+    - ReportService.isPhaseMatch() 添加 non-student 分支返回 false
+  - 前端 allowedPhases() 对非学生返回空数组 []，自然过滤所有考纲词
+  - 非学生用户界面调整：
+    - 仪表盘隐藏"考纲词汇"统计卡片
+    - 单词学习页筛选器默认切到"自建词汇"
+    - 个人中心阶段标签显示"非学生"
+
+  **单词列表分页增加跳转功能**：
+  - 单词学习页面底部分页组件新增页码输入跳转（jumper），用户可输入页码直接跳转到指定页
+
+  **移除生词"已复习x次"显示**：
+  - 学习报告页面的"最近生词记录"中移除"复习 {{ mw.reviewCount || 0 }} 次"字样
+  - 生词本列表中移除"复习 {{ mw.reviewCount || 0 }} 次"字样
+
+- **修改文件**:
+  - `src/main/java/cn/edu/cuc/class10/service/WordService.java` - isInUserPhase 添加 non-student 分支
+  - `src/main/java/cn/edu/cuc/class10/service/TestService.java` - isPhaseMatch 添加 non-student 分支
+  - `src/main/java/cn/edu/cuc/class10/service/ReportService.java` - isPhaseMatch 添加 non-student 分支
+  - `src/main/resources/static/login.html` - 注册表单学习阶段添加"非学生"选项
+  - `src/main/resources/static/dashboard.html` - 多项前端适配
+
