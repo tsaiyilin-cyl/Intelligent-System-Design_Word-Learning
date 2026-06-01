@@ -432,7 +432,61 @@
             font-size: 22px;
             color: var(--primary);
             font-weight: 500;
-            margin-bottom: 28px;
+            margin-bottom: 16px;
+        }
+
+        /* ===== 单词图片 ===== */
+        .study-card-big .sc-image-wrap {
+            width: 100%;
+            max-height: 260px;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            background: #f5f7fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .study-card-big .sc-image-wrap img {
+            width: 100%;
+            height: auto;
+            max-height: 260px;
+            object-fit: contain;
+            display: block;
+        }
+        .study-card-big .sc-image-loading {
+            width: 100%;
+            height: 180px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #c0c4cc;
+            gap: 8px;
+            font-size: 14px;
+        }
+        .study-card-big .sc-image-loading .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #ebeef5;
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: sc-spin 0.8s linear infinite;
+        }
+        @keyframes sc-spin { to { transform: rotate(360deg); } }
+        .study-card-big .sc-image-placeholder {
+            width: 100%;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #dcdfe6;
+            font-size: 13px;
+            margin-bottom: 16px;
+            background: #fafafa;
+            border-radius: 12px;
+            border: 1px dashed #e4e7ed;
         }
 
         .study-card-big .sc-buttons {
@@ -477,6 +531,27 @@
         .study-card-big .sc-footer button:hover {
             background: #f0f2f5;
             color: var(--primary);
+        }
+        .study-card-big .sc-footer .nav-arrows {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .study-card-big .sc-footer .nav-arrows button {
+            font-size: 18px;
+            padding: 4px 10px;
+            line-height: 1;
+            min-width: 36px;
+        }
+        .study-card-big .sc-footer .nav-arrows button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        .study-card-big .sc-footer .nav-arrows .nav-index {
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding: 0 4px;
+            user-select: none;
         }
 
         /* ===== 空状态 ===== */
@@ -1334,11 +1409,29 @@
                     <div class="sc-word">{{ mistakeReviewWord?.content }}</div>
                     <div class="sc-phonetic">{{ mistakeReviewWord?.phonetic || '' }}</div>
                     <div class="sc-trans">{{ mistakeReviewWord?.translation }}</div>
+                    <!-- 单词图片 -->
+                    <div v-if="mistakeWordImageLoading" class="sc-image-wrap">
+                        <div class="sc-image-loading">
+                            <div class="spinner"></div>
+                            <span>🤖 AI 生成图片中…</span>
+                        </div>
+                    </div>
+                    <div v-else-if="mistakeWordImageUrl" class="sc-image-wrap">
+                        <img :src="mistakeWordImageUrl" :alt="mistakeReviewWord?.content" loading="lazy" />
+                    </div>
+                    <div v-else class="sc-image-placeholder">
+                        <span>🖼️ 暂无图片</span>
+                    </div>
                     <div style="display:flex; gap:16px; justify-content:center; margin-top:28px;">
                         <button class="sc-btn sc-btn-familiar" @click="handleMistakeReview('known')" style="padding:16px 32px; font-size:16px;">✅ 认识了</button>
                         <button class="sc-btn sc-btn-unfamiliar" @click="handleMistakeReview('unfamiliar')" style="padding:16px 32px; font-size:16px;">🔄 还不熟</button>
                     </div>
                     <div class="sc-footer">
+                        <div class="nav-arrows">
+                            <button @click="prevMistakeWord" :disabled="mistakeReviewIndex <= 0">◀</button>
+                            <span class="nav-index">{{ mistakeReviewIndex + 1 }} / {{ mistakeReviewWords.length }}</span>
+                            <button @click="nextMistakeWord" :disabled="mistakeReviewIndex >= mistakeReviewWords.length - 1">▶</button>
+                        </div>
                         <button @click="mistakeReviewShowDetail">🤔 有点模糊？查看单词详情</button>
                         <button @click="mistakeReviewActive = false">退出复习</button>
                     </div>
@@ -1824,6 +1917,19 @@
             <div class="sc-word">{{ studyWord?.content }}</div>
             <div class="sc-phonetic">{{ studyWord?.phonetic || '' }}</div>
             <div class="sc-trans">{{ studyWord?.translation }}</div>
+            <!-- AI 生成图片 -->
+            <div v-if="studyWordImageLoading" class="sc-image-wrap">
+                <div class="sc-image-loading">
+                    <div class="spinner"></div>
+                    <span>🤖 AI 生成图片中…</span>
+                </div>
+            </div>
+            <div v-else-if="studyWordImageUrl" class="sc-image-wrap">
+                <img :src="studyWordImageUrl" :alt="studyWord?.content" loading="lazy" />
+            </div>
+            <div v-else class="sc-image-placeholder">
+                <span>🖼️ 暂无图片</span>
+            </div>
             <div class="sc-buttons">
                 <button class="sc-btn sc-btn-familiar" @click="handleStudyFeedback('familiar')">😊 熟悉</button>
                 <button class="sc-btn sc-btn-vague" @click="handleStudyFeedback('vague')">😕 模糊</button>
@@ -1831,6 +1937,11 @@
                 <button class="sc-btn sc-btn-mastered" @click="handleStudyFeedback('mastered')">🎯 已掌握</button>
             </div>
             <div class="sc-footer">
+                <div class="nav-arrows">
+                    <button @click="prevWord" :disabled="studyIndex <= 0">◀</button>
+                    <span class="nav-index">{{ studyIndex + 1 }} / {{ studyWords.length }}</span>
+                    <button @click="nextWord" :disabled="studyIndex >= studyWords.length - 1">▶</button>
+                </div>
                 <button @click="studyWordDetail">📖 查看详情</button>
                 <button @click="studyModalVisible = false">退出学习</button>
             </div>
@@ -2085,6 +2196,9 @@ const app = createApp({
         const studyWords = ref([]);
         const studyIndex = ref(0);
         const studyWord = computed(() => studyWords.value[studyIndex.value]);
+        // 单词图片
+        const studyWordImageUrl = ref(null);
+        const studyWordImageLoading = ref(false);
         const showStudyModeDialog = ref(false);
         const studyModeOrder = ref('random');
 
@@ -2237,6 +2351,8 @@ const app = createApp({
             } finally {
                 wordsLoading.value = false;
             }
+            // 预加载单词列表中所有单词的图片（分散生成压力）
+            preloadWordImages(words.value);
         }
 
         // ========== 单词详情对话框 ==========
@@ -2268,6 +2384,8 @@ const app = createApp({
             // 加载相似词义和相似词形（通过后端查漏补缺）
             loadSimilarWords(w);
             wordDetailVisible.value = true;
+            // 查看详情时预加载该单词图片
+            preloadWordImages([w]);
         }
 
         let similarWordsCache = {};
@@ -2349,6 +2467,8 @@ const app = createApp({
                         return;
                     }
                     studyWords.value = list;
+                    // 预加载待学习单词的图片
+                    preloadWordImages(list);
                     // 弹出排序选择对话框
                     showStudyModeDialog.value = true;
                 }
@@ -2369,6 +2489,22 @@ const app = createApp({
             studyIndex.value = 0;
             showStudyModeDialog.value = false;
             studyModalVisible.value = true;
+        }
+
+        function prevWord() {
+            if (studyIndex.value <= 0) {
+                ElementPlus.ElMessage.info('已经是第一个单词了');
+                return;
+            }
+            studyIndex.value--;
+        }
+
+        function nextWord() {
+            if (studyIndex.value >= studyWords.value.length - 1) {
+                ElementPlus.ElMessage.info('已经是最后一个单词了');
+                return;
+            }
+            studyIndex.value++;
         }
 
         async function handleStudyFeedback(action) {
@@ -2395,6 +2531,45 @@ const app = createApp({
             }
         }
 
+        // ========== 单词图片懒加载 ==========
+        async function loadStudyWordImage() {
+            const w = studyWord.value;
+            if (!w) {
+                studyWordImageUrl.value = null;
+                studyWordImageLoading.value = false;
+                return;
+            }
+            studyWordImageLoading.value = true;
+            studyWordImageUrl.value = null;
+            try {
+                const res = await axios.get('/api/words/image/' + w.wordId);
+                if (res.data.code === 200 && res.data.data?.imageUrl) {
+                    studyWordImageUrl.value = res.data.data.imageUrl;
+                }
+            } catch (e) {
+                console.error('加载单词图片失败:', e);
+            } finally {
+                studyWordImageLoading.value = false;
+            }
+        }
+
+        // 学习卡片切换单词时触发图片加载
+        watch(studyWord, () => {
+            loadStudyWordImage();
+        }, { immediate: false });
+
+        // ========== 图片预加载（分散到各访问点） ==========
+        async function preloadWordImages(words) {
+            if (!words || words.length === 0) return;
+            const wordIds = words.map(w => w.wordId).filter(Boolean);
+            if (wordIds.length === 0) return;
+            try {
+                await axios.post('/api/words/image/preload', { wordIds });
+            } catch (e) {
+                // 预加载是尽力而为，静默失败
+            }
+        }
+
         // ========== 测试 ==========
         async function startTest() {
             if (!user.value) { ElementPlus.ElMessage.warning('请先登录'); return; }
@@ -2408,6 +2583,12 @@ const app = createApp({
                     const data = res.data.data;
                     testSessionId.value = data.sessionId;
                     testQuestions.value = data.questions || [];
+                    // 预加载测试题中涉及的单词图片
+                    const testWords = (data.questions || []).map(q => ({
+                        wordId: q.wordId,
+                        content: q.content
+                    })).filter(w => w.wordId);
+                    preloadWordImages(testWords);
                     testIndex.value = 0;
                     testCorrect.value = 0;
                     testSelected.value = '';
@@ -2707,6 +2888,11 @@ const app = createApp({
                 });
                 if (res.data.code === 200) {
                     mistakeWords.value = res.data.data || [];
+                    // 预加载生词列表中所有单词的图片
+                    preloadWordImages(mistakeWords.value.map(m => ({
+                        wordId: m.wordId || m.word?.wordId,
+                        content: m.word?.content || m.content
+                    })).filter(w => w.wordId));
                 }
             } catch(e) { console.error(e); }
         }
@@ -2716,6 +2902,9 @@ const app = createApp({
         const mistakeReviewWords = ref([]);
         const mistakeReviewIndex = ref(0);
         const mistakeReviewWord = computed(() => mistakeReviewWords.value[mistakeReviewIndex.value]);
+        // 生词本复习单词图片
+        const mistakeWordImageUrl = ref(null);
+        const mistakeWordImageLoading = ref(false);
 
         async function startMistakeReview() {
             if (!user.value) return;
@@ -2729,9 +2918,12 @@ const app = createApp({
                         ElementPlus.ElMessage.info('生词本为空，暂无需要复习的单词');
                         return;
                     }
-                    mistakeReviewWords.value = list.sort(() => Math.random() - 0.5);
+                    // 保持 API 返回的顺序，从第一个词开始
+                    mistakeReviewWords.value = list;
                     mistakeReviewIndex.value = 0;
                     mistakeReviewActive.value = true;
+                    // 预加载生词本复习单词的图片
+                    preloadWordImages(mistakeReviewWords.value);
                 } else {
                     ElementPlus.ElMessage.error('加载复习列表失败');
                 }
@@ -2741,17 +2933,36 @@ const app = createApp({
             }
         }
 
-        function startSingleMistakeReview(mw) {
-            const wordData = {
-                wordId: mw.wordId || mw.word?.wordId,
-                content: mw.word?.content || mw.content,
-                translation: mw.word?.translation || mw.translation,
-                phonetic: mw.word?.phonetic || mw.phonetic || '',
-                familiarity: mw.familiarity
-            };
-            mistakeReviewWords.value = [wordData];
-            mistakeReviewIndex.value = 0;
-            mistakeReviewActive.value = true;
+        async function startSingleMistakeReview(mw) {
+            if (!user.value) return;
+            const targetWordId = mw.wordId || mw.word?.wordId;
+            if (!targetWordId) return;
+            try {
+                const res = await axios.get('/api/mistake/review/list', {
+                    params: { userId: user.value.userId }
+                });
+                if (res.data.code === 200) {
+                    const list = res.data.data || [];
+                    if (list.length === 0) {
+                        ElementPlus.ElMessage.info('生词本为空，暂无需要复习的单词');
+                        return;
+                    }
+                    // 保持和"开始复习"完全相同的列表顺序，直接跳到点击的词所在位置
+                    mistakeReviewWords.value = list;
+                    const idx = list.findIndex(
+                        w => (w.wordId || w.word?.wordId) === targetWordId
+                    );
+                    mistakeReviewIndex.value = idx >= 0 ? idx : 0;
+                    mistakeReviewActive.value = true;
+                    // 预加载复习单词的图片
+                    preloadWordImages(mistakeReviewWords.value);
+                } else {
+                    ElementPlus.ElMessage.error('加载复习列表失败');
+                }
+            } catch (e) {
+                console.error(e);
+                ElementPlus.ElMessage.error('网络错误');
+            }
         }
 
         async function removeMistakeWord(mw) {
@@ -2775,6 +2986,50 @@ const app = createApp({
                 if (e !== 'cancel') console.error(e);
             }
         }
+
+        // ========== 生词本复习 - 前后翻页 ==========
+        function prevMistakeWord() {
+            if (mistakeReviewIndex.value <= 0) {
+                ElementPlus.ElMessage.info('已经是第一个单词了');
+                return;
+            }
+            mistakeReviewIndex.value--;
+        }
+
+        function nextMistakeWord() {
+            if (mistakeReviewIndex.value >= mistakeReviewWords.value.length - 1) {
+                ElementPlus.ElMessage.info('已经是最后一个单词了');
+                return;
+            }
+            mistakeReviewIndex.value++;
+        }
+
+        // ========== 生词本复习 - 图片懒加载 ==========
+        async function loadMistakeWordImage() {
+            const w = mistakeReviewWord.value;
+            if (!w) {
+                mistakeWordImageUrl.value = null;
+                mistakeWordImageLoading.value = false;
+                return;
+            }
+            mistakeWordImageLoading.value = true;
+            mistakeWordImageUrl.value = null;
+            try {
+                const res = await axios.get('/api/words/image/' + w.wordId);
+                if (res.data.code === 200 && res.data.data?.imageUrl) {
+                    mistakeWordImageUrl.value = res.data.data.imageUrl;
+                }
+            } catch (e) {
+                console.error('加载生词图片失败:', e);
+            } finally {
+                mistakeWordImageLoading.value = false;
+            }
+        }
+
+        // 生词本切换单词时触发图片加载
+        watch(mistakeReviewWord, () => {
+            loadMistakeWordImage();
+        }, { immediate: false });
 
         async function handleMistakeReview(action) {
             const w = mistakeReviewWord.value;
@@ -3102,8 +3357,10 @@ const app = createApp({
 
             // 学习模式
             studyModalVisible, studyWords, studyIndex, studyWord,
+            studyWordImageUrl, studyWordImageLoading,
             showStudyModeDialog, studyModeOrder,
             startStudyMode, confirmStartStudyMode, handleStudyFeedback, studyWordDetail,
+            prevWord, nextWord,
 
             // 测试
             testActive, testType, testCount, testQuestions,
@@ -3140,7 +3397,9 @@ const app = createApp({
 
             // 生词本复习
             mistakeReviewActive, mistakeReviewWords, mistakeReviewIndex, mistakeReviewWord,
+            mistakeWordImageUrl, mistakeWordImageLoading,
             startMistakeReview, startSingleMistakeReview, removeMistakeWord, handleMistakeReview, mistakeReviewShowDetail,
+            prevMistakeWord, nextMistakeWord,
         };
     }
 });

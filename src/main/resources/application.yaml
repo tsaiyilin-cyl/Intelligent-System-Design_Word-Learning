@@ -20,3 +20,38 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+# ===== 单词图片配置 =====
+word-images:
+  # 图片本地存储目录（相对于项目根目录）
+  directory: word-images
+
+  # Unsplash 图库 API（免费，用于搜索单词相关图片）
+  # 注册获取 Access Key: https://unsplash.com/developers
+  unsplash:
+    # 多个 Key 用逗号分隔，每个 Key 独立计数，按顺序轮换使用
+    # 例如 3 个 Key 则每小时可调用 150 次
+    access-keys: "c_eO9fpkD5u4rx-NTZEOUY1s9pZjsjDND-pO0XlfSjo,
+    QryMwmiB6N4D-LF2ABI4J9WdzbPniy5d-i5efPSro_4,
+    ab6M1N_CHn3egJJWJbQNe4Uykf2HflSbMQDOg7F5gaI,
+    AS7hqLkprzq2dvxZ4XcHPt_9lCMK2VEo6MXwTJ-h9E4,
+    _1q46tjZzYMwXmT9-sl2ljip5RulvKnyzi0_J-Pv3GM,
+    dFwzCmmsEaBdbbxsbi09D9d3mGXxpHKQHZnmbNuFdH0,
+    GXfs9YfW9fjp2FQ9iTWCwti_wp5p_OJlG_As-I90Kkg,
+    EaXRkaKgjCq9Dc4c88mhSUjTWE2uYd4ncX3iNS5H6ns,
+    1fHS3Hc88gKkTTgPROB-6yVXOj1fWjJ_JiW_YFvIZIk,
+    HB7PQam27Lc97NaevIvdTFJ5YvB5IS4cAOb86zAefMo,
+    -p5RNOZYIDXdjazFf2u44JExAl3PrVRJ6IZr8UvF3-Q,
+    gOD7ey9VzeKD-h4qLcLNA8N22BWVQHFTbe0SK6IzQvQ,
+    4EycfKZ839LCKFKLyHSzkuR1xiWVhxzEGDJSayY_wFc,
+    D5vc5AAbJT2MtzBgKf7-Me3onZ7RTeZoNNCTHwf3Wo8,
+    EXO0G2PvVn-c8a4FvbjDN1OQ_o-EyHHLrtyUoumhHqY,
+    8WAQe74KRA3F9E6zv2SQCAZfUt88g35Dn7xioHLuMhQ,
+    v_wRkvMatnGGQs_l-t9RFrSYAxTWDouUy8FqjRvPv1w,
+    8o8NnPzpp86XFqo5a8V176ODtyFWwk2Mwz85R7YG4ec,
+    qAgUKhBgnVnOKkSwIhgam8b9M7CZvcT72trssOLxUvw,
+    0QG0krJnHzCsR5bNyeCYIygZq-D_ILrzov3w5ciRu_g,
+    
+    "
+    # 每个 Key 的调用上限（Unsplash 免费额度 50 次/小时）
+    max-calls-per-key: 50
