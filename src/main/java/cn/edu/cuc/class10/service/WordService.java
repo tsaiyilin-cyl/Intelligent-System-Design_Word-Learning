@@ -37,8 +37,11 @@ public class WordService {
 
     public Word addWord(String content, String partOfSpeech, String translation,
                         String phonetic, WordType wordType, String userId) {
-        // 自建词：同一用户不能重复添加相同内容的词
-        if (wordType == WordType.CUSTOM && userId != null) {
+        if (wordType == WordType.CUSTOM) {
+            // 自建词必须有所属用户
+            if (userId == null || userId.isEmpty()) {
+                throw new RuntimeException("自建词必须指定所属用户");
+            }
             if (wordRepository.existsByContentAndUserIdAndWordType(content, userId, WordType.CUSTOM)) {
                 throw new RuntimeException("您已添加过该单词");
             }
@@ -46,6 +49,7 @@ public class WordService {
             newWord.setUserId(userId);
             return wordRepository.save(newWord);
         }
+        // 考纲词无需 userId
         Word newWord = new Word(content, partOfSpeech, translation, phonetic, wordType);
         return wordRepository.save(newWord);
     }

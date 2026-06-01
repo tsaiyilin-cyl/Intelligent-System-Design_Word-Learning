@@ -5,7 +5,7 @@ import java.util.Map;
 
 public class DashboardDataResponse {
     private int totalWords;          // 用户总词汇数（考纲范围内+自建）
-    private int masteredWords;       // 掌握单词数（熟悉度>=70）
+    private int masteredWords;       // 掌握单词数（衰减后有效熟悉度>=100）
     private double averageAccuracy;  // 近7天平均正确率（百分比）
     private List<DailyAccuracy> recentAccuracy; // 近7天每日正确率
     private List<TestRecord> recentTests;       // 最近5次测试记录

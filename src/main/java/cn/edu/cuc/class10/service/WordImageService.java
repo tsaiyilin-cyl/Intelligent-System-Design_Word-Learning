@@ -19,6 +19,8 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -93,10 +95,12 @@ public class WordImageService {
 
     /**
      * 获取单词图片 URL（懒加载 + 缓存）
+     * <p>
+     * 搜索链：本地缓存 → Unsplash → Bing 图片搜索 → 备用来源
      *
      * @param wordId      单词 ID
      * @param wordContent 单词内容（英文）
-     * @param translation 中文释义（仅日志记录，不参与搜索）
+     * @param translation 中文释义（用于中文搜索兜底）
      * @return 图片的静态资源路径（如 /word-images/xxx.jpg），无可用的图片时返回 null
      */
     public String getOrCreateImage(String wordId, String wordContent, String translation) {
@@ -114,36 +118,12 @@ public class WordImageService {
         }
 
         // 2. 尝试 Unsplash 搜索（多个 Key 顺序轮换）
-        ensureKeysInitialized();
-        if (!parsedKeys.isEmpty()) {
-            int seq = acquireCallSlot();
-            if (seq < 0) {
-                return null; // 所有 Key 额度已用完
-            }
+        String result = tryUnsplash(wordContent, imageFile);
+        if (result != null) return result;
 
-            int keyIdx = seq / maxCallsPerKey;          // 该用第几个 Key
-            int callInKey = seq % maxCallsPerKey + 1;    // 该 Key 的第几次调用
-            if (keyIdx >= parsedKeys.size()) {
-                log.warn("所有 Unsplash API Key 均已达到上限，跳过后续搜索");
-                return null;
-            }
-
-            String key = parsedKeys.get(keyIdx);
-            try {
-                log.info("Unsplash Key {} 调用第 {}/{} 次，搜索: {}", keyIdx + 1, callInKey, maxCallsPerKey, wordContent);
-                String imageUrl = searchUnsplash(key, wordContent);
-                if (imageUrl != null) {
-                    downloadImage(imageUrl, imageFile);
-                    if (imageFile.exists() && imageFile.length() > 0) {
-                        return "/word-images/" + sanitizeFileName(wordId) + ".jpg";
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("Unsplash 搜索失败 [Key {}] [{}]: {}", keyIdx + 1, wordContent, e.getMessage());
-            }
-        } else {
-            log.info("未配置 Unsplash Access Key，跳过图库搜索");
-        }
+        // 3. Unsplash 失败 → 尝试 Bing 图片搜索（中文释义优先，英文兜底）
+        result = tryBing(wordContent, translation, imageFile);
+        if (result != null) return result;
 
         return null;
     }
@@ -194,6 +174,44 @@ public class WordImageService {
     public record PreloadTask(String wordId, String wordContent, String translation) {}
 
     // ==================== Unsplash 搜索 ====================
+
+    /**
+     * 尝试从 Unsplash 获取图片
+     */
+    private String tryUnsplash(String keyword, File targetFile) {
+        ensureKeysInitialized();
+        if (parsedKeys.isEmpty()) {
+            log.info("未配置 Unsplash Access Key，跳过图库搜索");
+            return null;
+        }
+
+        int seq = acquireCallSlot();
+        if (seq < 0) {
+            return null; // 所有 Key 额度已用完
+        }
+
+        int keyIdx = seq / maxCallsPerKey;
+        int callInKey = seq % maxCallsPerKey + 1;
+        if (keyIdx >= parsedKeys.size()) {
+            log.warn("所有 Unsplash API Key 均已达到上限，跳过后续搜索");
+            return null;
+        }
+
+        String key = parsedKeys.get(keyIdx);
+        try {
+            log.info("Unsplash Key {} 调用第 {}/{} 次，搜索: {}", keyIdx + 1, callInKey, maxCallsPerKey, keyword);
+            String imageUrl = searchUnsplash(key, keyword);
+            if (imageUrl != null) {
+                downloadImage(imageUrl, targetFile);
+                if (targetFile.exists() && targetFile.length() > 0) {
+                    return "/word-images/" + sanitizeFileName(targetFile.getName().replace(".jpg", "")) + ".jpg";
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Unsplash 搜索失败 [Key {}] [{}]: {}", keyIdx + 1, keyword, e.getMessage());
+        }
+        return null;
+    }
 
     /**
      * 使用指定 Key 调用 Unsplash 搜索
@@ -268,6 +286,79 @@ public class WordImageService {
         } catch (Exception e) {
             log.error("下载图片失败 [{}]: {}", imageUrl, e.getMessage());
         }
+    }
+
+    /**
+     * 尝试从 Bing 图片搜索获取图片（中文/英文双语言搜索）
+     */
+    private String tryBing(String english, String chinese, File targetFile) {
+        // 中文释义优先搜索
+        if (StringUtils.hasText(chinese)) {
+            String kw = chinese.length() > 20 ? chinese.substring(0, 20) : chinese;
+            log.info("Bing 搜索（中文）: {}", kw);
+            if (doBingSearch(kw, targetFile)) return imageUrlPath(targetFile);
+        }
+        // 英文兜底
+        log.info("Bing 搜索（英文）: {}", english);
+        if (doBingSearch(english, targetFile)) return imageUrlPath(targetFile);
+        return null;
+    }
+
+    /**
+     * 执行一次 Bing 图片搜索并下载第一张有效图片
+     */
+    private boolean doBingSearch(String keyword, File targetFile) {
+        try {
+            String url = "https://cn.bing.com/images/search?q={keyword}&form=HDRSC2&first=1&count=5";
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+            headers.set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+            headers.set("Accept-Language", "zh-CN,zh;q=0.9");
+            HttpEntity<?> entity = new HttpEntity<>(headers);
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url, HttpMethod.GET, entity, String.class, keyword);
+
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                return false;
+            }
+
+            // 从 HTML 中提取 mediaurl 参数
+            Pattern pattern = Pattern.compile("mediaurl=(.*?)[&\"]");
+            Matcher matcher = pattern.matcher(response.getBody());
+            List<String> imageUrls = new ArrayList<>();
+            while (matcher.find()) {
+                String decoded = java.net.URLDecoder.decode(matcher.group(1), "UTF-8");
+                if (decoded.length() < 500 && !imageUrls.contains(decoded)) {
+                    imageUrls.add(decoded);
+                }
+            }
+
+            // 逐个尝试下载
+            for (String imgUrl : imageUrls) {
+                // 跳过 data: URI 和小图标
+                if (imgUrl.startsWith("data:") || imgUrl.length() < 20) continue;
+                try {
+                    downloadImage(imgUrl, targetFile);
+                    if (targetFile.exists() && targetFile.length() > 2000) {
+                        log.info("Bing 下载成功: {} -> {}", keyword, targetFile.getName());
+                        return true;
+                    }
+                } catch (Exception ignored) {
+                    // 单张失败继续试下一张
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Bing 搜索失败 [{}]: {}", keyword, e.getMessage());
+        }
+        return false;
+    }
+
+    /**
+     * 根据目标文件生成图片 URL 路径
+     */
+    private String imageUrlPath(File file) {
+        return "/word-images/" + sanitizeFileName(file.getName().replace(".jpg", "")) + ".jpg";
     }
 
     /**

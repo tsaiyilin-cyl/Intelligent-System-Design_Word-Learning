@@ -44,12 +44,24 @@ public class ReportService {
                         (v1, v2) -> v1
                 ));
 
-        // 3. 掌握单词数（熟悉度>=100）
+        // 3. 获取最后交互时间（用于衰减计算）
+        Map<String, Long> lastInteractionMap = interactionRepository.findLastTimestampByUser(userId)
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> (String) ((Object[]) row)[0],
+                        row -> (Long) ((Object[]) row)[1]
+                ));
+
+        // 4. 掌握单词数（衰减后有效熟悉度>=100）
         long masteredCount = accessibleWords.stream()
-                .filter(w -> familiarityMap.getOrDefault(w.getWordId(), 50) >= 100)
+                .filter(w -> {
+                    int stored = familiarityMap.getOrDefault(w.getWordId(), 50);
+                    Long lastTime = lastInteractionMap.get(w.getWordId());
+                    return applyDecay(stored, lastTime) >= 100;
+                })
                 .count();
 
-        // 4. 近7天测试记录和正确率
+        // 5. 近7天测试记录和正确率
         long now = System.currentTimeMillis();
         long sevenDaysAgo = now - 7 * 24 * 3600 * 1000L;
         List<TestSession> recentSessions = testSessionRepository.findByUserIdAndEndTimeBetween(userId, sevenDaysAgo, now);
@@ -76,7 +88,7 @@ public class ReportService {
             dailyList.add(da);
         }
 
-        // 5. 最近5次测试记录
+        // 6. 最近5次测试记录
         List<TestSession> latestFive = testSessionRepository.findByUserIdOrderByEndTimeDesc(userId);
         if (latestFive.size() > 5) latestFive = latestFive.subList(0, 5);
         List<DashboardDataResponse.TestRecord> testRecords = latestFive.stream().map(s -> {
@@ -90,7 +102,7 @@ public class ReportService {
             return tr;
         }).collect(Collectors.toList());
 
-        // 6. 易错词TOP5：使用 SQL 聚合查询（仅查前5个）
+        // 7. 易错词TOP5：使用 SQL 聚合查询（仅查前5个）
         Pageable topFive = PageRequest.of(0, 5);
         List<Object[]> mistakeResults = interactionRepository.countMistakesByUserId(userId, topFive);
         List<DashboardDataResponse.MistakeWord> topMistakes = mistakeResults.stream()

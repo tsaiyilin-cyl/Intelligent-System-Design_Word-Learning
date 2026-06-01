@@ -448,4 +448,26 @@
   - 在 `application.yaml` 中配置 Unsplash Access Key（免费,有限额）
   - 图片存储目录：`word-images/`（项目根目录）
 
+### 批量下载缺失图片 & 修复统计 Bug
+- **成员**: 蔡奕麟
+- **审查**: 蔡奕麟
+- **工作内容:**
+
+  **批量下载 147 张缺失图片**：
+  - 扫描数据库与 `word-images/` 目录对比，找出 147 个缺少图片的单词
+  - 编写 Python 批量下载脚本，通过 Bing 图片搜索中文释义获取图片
+  - 对搜索失败的 3 个单词（cup / Edward Lear / Janson）单独补图（Unsplash + Alamy）
+  - 将Unsplash找不到相关图片时的兜底方法也写入wordImageService中
+
+  **修复学习报告熟悉度未衰减的问题**：
+  - `ReportService.getDashboardData()` 之前使用原始熟悉度判断是否掌握
+  - 改为与学习计划一致的 `applyDecay()` 衰减计算，两者现在结果一致
+
+  **自建词表单添加可复制 JSON 示例**：
+  - 编辑单词弹窗的"常用短语"和"例句"字段原来没有 placeholder
+  - 添加与新增弹窗一致的示例 placeholder 和"点击填入示例"按钮
+  - 用户点击即可填入标准 JSON 格式，方便修改
+
+
+
 
