@@ -15,8 +15,9 @@ public class WebConfig implements WebMvcConfigurer {
                 .setCachePeriod(0);
 
         // 单词图片存储目录（项目根目录下的 word-images/）
+        // 禁用缓存，方便开发者替换图片后实时看到效果
         registry.addResourceHandler("/word-images/**")
                 .addResourceLocations("file:./word-images/")
-                .setCachePeriod(3600); // 图片可缓存 1 小时
+                .setCachePeriod(0);
     }
 }
