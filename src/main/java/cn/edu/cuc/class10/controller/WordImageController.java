@@ -158,4 +158,30 @@ public class WordImageController {
         result.put("message", "已提交 " + tasks.size() + " 个图片预加载任务");
         return result;
     }
+
+    /**
+     * 编辑自建单词后重新生成图片（删除旧图 + 异步生成新图）
+     */
+    @PostMapping("/regenerate")
+    public Map<String, Object> regenerateImage(@RequestBody Map<String, String> body) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            String wordId = body.get("wordId");
+            if (wordId == null || wordId.isEmpty()) {
+                result.put("code", 400);
+                result.put("message", "缺少 wordId");
+                return result;
+            }
+
+            Word w = wordService.getWordById(wordId);
+            wordImageService.regenerateImageAsync(wordId, w.getContent(), w.getTranslation());
+
+            result.put("code", 200);
+            result.put("message", "图片重新生成任务已提交");
+        } catch (Exception e) {
+            result.put("code", 500);
+            result.put("message", "提交失败: " + e.getMessage());
+        }
+        return result;
+    }
 }

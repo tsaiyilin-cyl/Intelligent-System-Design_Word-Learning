@@ -79,6 +79,11 @@ public class WordController {
         try {
             Word word = wordService.updateWord(wordId, content, partOfSpeech, translation, phonetic);
 
+            // 释义变化时重新计算相似词义
+            if (translation != null) {
+                wordService.recalculateSimilarMeanings(wordId);
+            }
+
             result.put("code", 200);
             result.put("message", "更新成功");
             result.put("data", word);

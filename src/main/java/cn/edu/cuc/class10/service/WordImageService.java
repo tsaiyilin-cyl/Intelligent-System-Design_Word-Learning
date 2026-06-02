@@ -136,6 +136,38 @@ public class WordImageService {
         return file.exists() && file.length() > 0;
     }
 
+    /**
+     * 删除单词本地缓存的图片
+     */
+    public boolean deleteLocalImage(String wordId) {
+        File file = getImageFile(wordId);
+        if (file.exists()) {
+            boolean deleted = file.delete();
+            if (deleted) {
+                log.info("已删除单词图片缓存 [{}]", wordId);
+            } else {
+                log.warn("删除单词图片缓存失败 [{}]", wordId);
+            }
+            return deleted;
+        }
+        return false;
+    }
+
+    /**
+     * 删除旧图片并异步重新生成
+     */
+    public void regenerateImageAsync(String wordId, String wordContent, String translation) {
+        deleteLocalImage(wordId);
+        imagePreloader.submit(() -> {
+            try {
+                getOrCreateImage(wordId, wordContent, translation);
+                log.info("单词图片重新生成完成 [{}]", wordContent);
+            } catch (Exception e) {
+                log.warn("单词图片重新生成失败 [{}]: {}", wordContent, e.getMessage());
+            }
+        });
+    }
+
     // ==================== 异步预加载 ====================
 
     private final ExecutorService imagePreloader = Executors.newCachedThreadPool(r -> {

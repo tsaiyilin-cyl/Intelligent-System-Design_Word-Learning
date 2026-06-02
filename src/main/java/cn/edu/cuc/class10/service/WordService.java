@@ -12,6 +12,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -120,6 +121,77 @@ public class WordService {
     public Word getWordById(String wordId) {
         return wordRepository.findById(wordId)
                 .orElseThrow(() -> new RuntimeException("单词不存在"));
+    }
+
+    /**
+     * 编辑单词后重新计算相似词义（基于中文释义汉字重叠率 ≥30%）
+     */
+    @Transactional
+    public void recalculateSimilarMeanings(String wordId) {
+        Word word = getWordById(wordId);
+        String pos = word.getPartOfSpeech();
+        String translation = word.getTranslation();
+        if (pos == null || translation == null || translation.isEmpty()) return;
+
+        // 取主词性
+        String mainPos = pos.contains("/") ? pos.split("/")[0].trim() : pos;
+
+        // 查找同词性的所有单词
+        List<Word> samePosWords = wordRepository.findAll().stream()
+                .filter(w -> w.getWordId() != null && !w.getWordId().equals(wordId))
+                .filter(w -> w.getPartOfSpeech() != null && !w.getPartOfSpeech().isEmpty())
+                .filter(w -> {
+                    String wp = w.getPartOfSpeech().contains("/")
+                            ? w.getPartOfSpeech().split("/")[0].trim()
+                            : w.getPartOfSpeech();
+                    return wp.equals(mainPos);
+                })
+                .collect(Collectors.toList());
+
+        ObjectMapper mapper = new ObjectMapper();
+        List<Map<String, Object>> similarList = new java.util.ArrayList<>();
+
+        for (Word other : samePosWords) {
+            String t2 = other.getTranslation();
+            if (t2 == null || t2.isEmpty()) continue;
+
+            double overlap = translationOverlap(translation, t2);
+            if (overlap >= 0.3) {
+                Map<String, Object> entry = new java.util.HashMap<>();
+                entry.put("word_id", other.getWordId());
+                entry.put("similarity_score", overlap);
+                similarList.add(entry);
+            }
+        }
+
+        similarList.sort((a, b) -> Double.compare(
+                (double) b.get("similarity_score"),
+                (double) a.get("similarity_score")
+        ));
+
+        // 保留最多 8 个
+        if (similarList.size() > 8) similarList = similarList.subList(0, 8);
+
+        try {
+            word.setSimilarMeanings(mapper.writeValueAsString(similarList));
+            wordRepository.save(word);
+        } catch (Exception ignored) {}
+    }
+
+    /**
+     * 计算两个中文释义的汉字重叠率
+     */
+    private double translationOverlap(String t1, String t2) {
+        if (t1 == null || t2 == null || t1.isEmpty() || t2.isEmpty()) return 0;
+        String clean1 = t1.replaceAll("[\\s\\p{Punct}\\p{IsPunctuation}]", "");
+        String clean2 = t2.replaceAll("[\\s\\p{Punct}\\p{IsPunctuation}]", "");
+        java.util.Set<Character> chars1 = clean1.chars().mapToObj(c -> (char) c).collect(Collectors.toSet());
+        java.util.Set<Character> chars2 = clean2.chars().mapToObj(c -> (char) c).collect(Collectors.toSet());
+        java.util.Set<Character> intersection = new java.util.HashSet<>(chars1);
+        intersection.retainAll(chars2);
+        java.util.Set<Character> union = new java.util.HashSet<>(chars1);
+        union.addAll(chars2);
+        return union.isEmpty() ? 0 : (double) intersection.size() / union.size();
     }
 
     public List<Word> getAllWords() {

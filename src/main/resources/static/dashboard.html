@@ -1187,19 +1187,25 @@
                         <el-input v-model="addWordForm.phonetic" placeholder="例如：/kəmˈpjuː.tər/" />
                     </el-form-item>
                     <el-form-item label="常用短语（JSON）">
-                        <el-input v-model="addWordForm.phrases" type="textarea" :rows="3" placeholder='[{"phrase":"personal computer","translation":"个人电脑"}]' />
-                        <div style="font-size:12px; color:#909399; margin-top:4px; display:flex; gap:8px; flex-wrap:wrap;">
-                            <span>💡 JSON格式，请用双引号</span>
-                            <code style="cursor:pointer; color:#409eff;" @click="fillSamplePhrases('add')">填入示例</code>
-                            <code style="cursor:pointer; color:#67c23a;" @click="fillPhrasesTemplate('add')">填入空模板</code>
+                        <div style="font-size:12px; color:#909399; margin-bottom:4px;">
+                            <code style="cursor:pointer; color:#409eff;" @click="addWordForm.phrases = EXAMPLE_PHRASE">📋 复制示例</code>
+                        </div>
+                        <el-input v-model="addWordForm.phrases" type="textarea" :rows="3" :placeholder='placeholderPhrases' />
+                        <div style="font-size:12px; color:#909399; margin-top:4px;">
+                            <span style="color:#999;">💡 JSON格式</span>
+                            <span style="margin:0 6px; color:#ddd;">|</span>
+                            <span style="cursor:pointer; color:#67c23a;" @click="fillPhrasesTemplate('add')">填入空模板</span>
                         </div>
                     </el-form-item>
                     <el-form-item label="例句（JSON）">
-                        <el-input v-model="addWordForm.sentences" type="textarea" :rows="3" placeholder='[{"sentence":"I bought a computer.","translation":"我买了一台电脑。"}]' />
-                        <div style="font-size:12px; color:#909399; margin-top:4px; display:flex; gap:8px; flex-wrap:wrap;">
-                            <span>💡 JSON格式，请用双引号</span>
-                            <code style="cursor:pointer; color:#409eff;" @click="fillSampleSentences('add')">填入示例</code>
-                            <code style="cursor:pointer; color:#67c23a;" @click="fillSentencesTemplate('add')">填入空模板</code>
+                        <div style="font-size:12px; color:#909399; margin-bottom:4px;">
+                            <code style="cursor:pointer; color:#409eff;" @click="addWordForm.sentences = EXAMPLE_SENTENCE">📋 复制示例</code>
+                        </div>
+                        <el-input v-model="addWordForm.sentences" type="textarea" :rows="3" :placeholder='placeholderSentences' />
+                        <div style="font-size:12px; color:#909399; margin-top:4px;">
+                            <span style="color:#999;">💡 JSON格式</span>
+                            <span style="margin:0 6px; color:#ddd;">|</span>
+                            <span style="cursor:pointer; color:#67c23a;" @click="fillSentencesTemplate('add')">填入空模板</span>
                         </div>
                     </el-form-item>
                 </el-form>
@@ -1213,7 +1219,7 @@
             <el-dialog v-model="showEditWordDialog" title="编辑自建单词" width="520px" :close-on-click-modal="false" @closed="resetEditForm">
                 <el-form :model="editWordForm" label-position="top" size="default">
                     <el-form-item label="单词" required>
-                        <el-input v-model="editWordForm.content" placeholder="例如：computer" />
+                        <el-input v-model="editWordForm.content" disabled />
                     </el-form-item>
                     <el-form-item label="词性（可多选）" required>
                         <el-checkbox-group v-model="editWordForm.posList">
@@ -1229,19 +1235,25 @@
                         <el-input v-model="editWordForm.phonetic" placeholder="例如：/kəmˈpjuː.tər/" />
                     </el-form-item>
                     <el-form-item label="常用短语（JSON）">
-                        <el-input v-model="editWordForm.phrases" type="textarea" :rows="3" placeholder='[{"phrase":"personal computer","translation":"个人电脑"}]' />
-                        <div style="font-size:12px; color:#909399; margin-top:4px; display:flex; gap:8px; flex-wrap:wrap;">
-                            <span>💡 JSON格式，请用双引号</span>
-                            <code style="cursor:pointer; color:#409eff;" @click="fillSamplePhrases('edit')">填入示例</code>
-                            <code style="cursor:pointer; color:#67c23a;" @click="fillPhrasesTemplate('edit')">填入空模板</code>
+                        <div style="font-size:12px; color:#909399; margin-bottom:4px;">
+                            <code style="cursor:pointer; color:#409eff;" @click="editWordForm.phrases = EXAMPLE_PHRASE">📋 复制示例</code>
+                        </div>
+                        <el-input v-model="editWordForm.phrases" type="textarea" :rows="3" :placeholder='placeholderPhrases' />
+                        <div style="font-size:12px; color:#909399; margin-top:4px;">
+                            <span style="color:#999;">💡 JSON格式</span>
+                            <span style="margin:0 6px; color:#ddd;">|</span>
+                            <span style="cursor:pointer; color:#67c23a;" @click="fillPhrasesTemplate('edit')">填入空模板</span>
                         </div>
                     </el-form-item>
                     <el-form-item label="例句（JSON）">
-                        <el-input v-model="editWordForm.sentences" type="textarea" :rows="3" placeholder='[{"sentence":"I bought a computer.","translation":"我买了一台电脑。"}]' />
-                        <div style="font-size:12px; color:#909399; margin-top:4px; display:flex; gap:8px; flex-wrap:wrap;">
-                            <span>💡 JSON格式，请用双引号</span>
-                            <code style="cursor:pointer; color:#409eff;" @click="fillSampleSentences('edit')">填入示例</code>
-                            <code style="cursor:pointer; color:#67c23a;" @click="fillSentencesTemplate('edit')">填入空模板</code>
+                        <div style="font-size:12px; color:#909399; margin-bottom:4px;">
+                            <code style="cursor:pointer; color:#409eff;" @click="editWordForm.sentences = EXAMPLE_SENTENCE">📋 复制示例</code>
+                        </div>
+                        <el-input v-model="editWordForm.sentences" type="textarea" :rows="3" :placeholder='placeholderSentences' />
+                        <div style="font-size:12px; color:#909399; margin-top:4px;">
+                            <span style="color:#999;">💡 JSON格式</span>
+                            <span style="margin:0 6px; color:#ddd;">|</span>
+                            <span style="cursor:pointer; color:#67c23a;" @click="fillSentencesTemplate('edit')">填入空模板</span>
                         </div>
                     </el-form-item>
                 </el-form>
@@ -2110,6 +2122,14 @@ const app = createApp({
         const TEMPLATE_SENTENCES = JSON.stringify([
             { sentence: '', translation: '' }
         ]);
+        const EXAMPLE_PHRASE = JSON.stringify([
+            { phrase: '...', translation: '...' }
+        ]);
+        const EXAMPLE_SENTENCE = JSON.stringify([
+            { sentence: '...', translation: '...' }
+        ]);
+        const placeholderPhrases = '[{"phrase":"personal computer","translation":"个人电脑"}]';
+        const placeholderSentences = '[{"sentence":"I bought a computer.","translation":"我买了一台电脑。"}]';
 
         function fillSamplePhrases(form) {
             const target = form === 'add' ? addWordForm : editWordForm;
@@ -2225,6 +2245,10 @@ const app = createApp({
                             }
                         });
                     }
+                    // 编辑成功 → 重新生成图片
+                    try {
+                        await axios.post('/api/words/image/regenerate', { wordId: editingWordId.value });
+                    } catch (_e) { /* 图片生成失败不影响编辑结果 */ }
                     ElementPlus.ElMessage.success('修改成功');
                     showEditWordDialog.value = false;
                     resetEditForm();
@@ -3420,6 +3444,10 @@ const app = createApp({
             addWordLoading, editWordLoading, addWordForm, editWordForm,
             posOptions, resetAddForm, resetEditForm,
             confirmAddWord, editWord, confirmEditWord, deleteWord,
+            fillSamplePhrases, fillSampleSentences,
+            fillPhrasesTemplate, fillSentencesTemplate,
+            placeholderPhrases, placeholderSentences,
+            EXAMPLE_PHRASE, EXAMPLE_SENTENCE,
 
             // 学习模式
             studyModalVisible, studyWords, studyIndex, studyWord,
