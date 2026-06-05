@@ -21,6 +21,7 @@ taskkill /F /PID xxx
 将找到的端口写到xxx的位置，把它关掉
 
 # 他人机器使用注意事项
+## 方法一：配置完整环境（复杂但稳定）
 1、数据库使用mysql，启动mysql服务之后，在项目目录下执行命令即可拷贝数据：
 ```
 mysql -u root -p < class10_dump.sql
@@ -29,6 +30,14 @@ mysql -u root -p < class10_dump.sql
 2、外部库至少需要满足：java17：graalvm-ce-17能够提供的功能
 
 3、依赖构建工具Maven
+
+## 方法二：接收WAR包
+1、依赖mysql和JDK17
+
+```
+java -jar class10.war
+```
+即可启动服务，在浏览器访问
 
 # 开发者事项
 
