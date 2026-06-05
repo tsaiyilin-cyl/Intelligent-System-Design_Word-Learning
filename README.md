@@ -21,70 +21,14 @@ taskkill /F /PID xxx
 将找到的端口写到xxx的位置，把它关掉
 
 # 他人机器使用注意事项
-1、数据库使用mysql,可以在终端用mysql命令添加用户
+1、数据库使用mysql，启动mysql服务之后，在项目目录下执行命令即可拷贝数据：
+```
+mysql -u root -p < class10_dump.sql
+```
 
 2、外部库至少需要满足：java17：graalvm-ce-17能够提供的功能
 
-3、建表命令：
-其他建表 SQL（手动执行）
-  ```sql
-  CREATE TABLE `interactions` (
-      `interaction_id` VARCHAR(36) PRIMARY KEY,
-      `user_id` VARCHAR(36) NOT NULL,
-      `word_id` VARCHAR(36) NOT NULL,
-      `feedback` ENUM('known','unknown') NOT NULL,
-      `timestamp` BIGINT NOT NULL,
-      INDEX idx_user_word_time (`user_id`, `word_id`, `timestamp`)
-  );
-
-  CREATE TABLE `user_word_familiarity` (
-      `user_id` VARCHAR(36) NOT NULL,
-      `word_id` VARCHAR(36) NOT NULL,
-      `familiarity` INT NOT NULL,
-      `last_update` BIGINT NOT NULL,
-      PRIMARY KEY (`user_id`, `word_id`)
-  );
-
-  CREATE TABLE `test_sessions` (
-      `session_id` VARCHAR(36) PRIMARY KEY,
-      `user_id` VARCHAR(36) NOT NULL,
-      `question_type` VARCHAR(50),
-      `total_questions` INT NOT NULL,
-      `correct_count` INT NOT NULL,
-      `start_time` BIGINT NOT NULL,
-      `end_time` BIGINT NOT NULL,
-      `create_time` BIGINT,
-      INDEX idx_user_end_time (`user_id`, `end_time`)
-  );
-
-  CREATE TABLE `test_answer_records` (
-      `record_id` VARCHAR(36) PRIMARY KEY,
-      `session_id` VARCHAR(36) NOT NULL,
-      `question_index` INT NOT NULL,
-      `word_id` VARCHAR(36),
-      `question_type` VARCHAR(50),
-      `question_content` TEXT,
-      `correct_answer` TEXT,
-      `user_answer` TEXT,
-      `is_correct` BOOLEAN NOT NULL,
-      `options_json` TEXT,
-      INDEX idx_session_id (`session_id`)
-  );
-
-  CREATE TABLE `mistake_words` (
-      `record_id` VARCHAR(36) PRIMARY KEY,
-      `user_id` VARCHAR(36) NOT NULL,
-      `word_id` VARCHAR(36) NOT NULL,
-      `create_time` BIGINT NOT NULL,
-      `review_count` INT NOT NULL DEFAULT 0,
-      `last_review_time` BIGINT,
-      INDEX idx_user_id (`user_id`),
-      UNIQUE KEY uk_user_word (`user_id`, `word_id`)
-  );
-    ALTER TABLE words MODIFY COLUMN similar_meanings TEXT;
-    ALTER TABLE words MODIFY COLUMN similar_spellings TEXT;
-    ALTER TABLE words DROP COLUMN familiarity;
-```
+3、依赖构建工具Maven
 
 # 开发者事项
 
