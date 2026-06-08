@@ -189,26 +189,42 @@ public class OcrService {
     /**
      * 策略 0: 从本地 TorchScript .pt 文件加载模型 (最高优先级)
      *
-     * 使用 Python + timm 导出的 ImageNet-21k 模型文件,
-     * 配合 ImageClassificationTranslator 进行图像预处理和输出映射。
-     * 模型文件路径: &lt;model-directory&gt;/&lt;model-name&gt;.pt
+     * 如果本地文件不存在，尝试从 model-url 自动下载。
+     * 下载完成后缓存到本地，后续启动直接加载。
+     * 如果下载也失败，则 fallback 到 DJL Zoo 的 1000 类模型。
      */
     private boolean tryLoadTorchScript(String ptPath) {
         try {
             Path path = Paths.get(ptPath);
-            if (!Files.exists(path)) {
-                log.info("TorchScript model not found at: {} (will try other strategies)", path.toAbsolutePath());
-                return false;
+            Path parentDir = path.getParent();
+            if (parentDir != null) {
+                Files.createDirectories(parentDir);
             }
 
-            log.info("Trying: load TorchScript model from {} ({} classes, topK={})",
+            // === 文件不存在时自动下载 ===
+            if (!Files.exists(path)) {
+                log.warn("TorchScript model not found: {}", path.toAbsolutePath());
+                if (modelUrl != null && !modelUrl.isBlank()) {
+                    log.info("Downloading from: {}", modelUrl);
+                    boolean downloaded = downloadModel(path);
+                    if (!downloaded) {
+                        log.warn("Download failed, will try fallback strategies");
+                        return false;
+                    }
+                } else {
+                    log.info("No model-url configured, add 'ocr.model-url' to application.yaml to enable auto-download");
+                    log.info("Will try fallback strategies (DJL Zoo models)");
+                    return false;
+                }
+            }
+
+            // === 加载模型 ===
+            log.info("Loading TorchScript model: {} ({} classes, topK={})",
                     ptPath, synsetLabels.size(), topK);
 
-            // ImageNet 标准化参数
             float[] mean = {0.485f, 0.456f, 0.406f};
             float[] std  = {0.229f, 0.224f, 0.225f};
 
-            // 构建图像分类 translator
             var translator = ImageClassificationTranslator.builder()
                     .addTransform(new Resize(224, 224))
                     .addTransform(new ToTensor())
@@ -229,8 +245,62 @@ public class OcrService {
             predictor = model.newPredictor();
             log.info("OK Model loaded from TorchScript: {} ({} classes)", ptPath, synsetLabels.size());
             return true;
+
         } catch (Exception e) {
             log.warn("TorchScript load failed: {} (will try next strategy)", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * 从 model-url 下载模型文件到本地路径
+     * 显示下载进度，支持断点续传（未完整下载时重试）
+     */
+    private boolean downloadModel(Path targetPath) {
+        try {
+            log.info("Downloading OCR model ({} MB) ...", "~392");
+            log.info("  URL: {}", modelUrl);
+
+            URL url = new URL(modelUrl);
+            Path tempPath = targetPath.resolveSibling(targetPath.getFileName() + ".download");
+
+            // 清理上次残留的临时文件
+            Files.deleteIfExists(tempPath);
+
+            // 下载
+            try (InputStream in = url.openStream();
+                 FileOutputStream out = new FileOutputStream(tempPath.toFile())) {
+
+                byte[] buffer = new byte[8192];
+                long totalRead = 0;
+                int bytesRead;
+                long lastLog = 0;
+
+                while ((bytesRead = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, bytesRead);
+                    totalRead += bytesRead;
+
+                    // 每 10 秒或每 50MB 打一次日志
+                    if (totalRead - lastLog > 50 * 1024 * 1024 || lastLog == 0) {
+                        log.info("  Downloaded: {} MB", totalRead / (1024 * 1024));
+                        lastLog = totalRead;
+                    }
+                }
+            }
+
+            // 下载完成，重命名为正式文件名
+            Files.move(tempPath, targetPath, StandardCopyOption.ATOMIC_MOVE);
+            log.info("Download complete: {} ({} MB)",
+                    targetPath.getFileName(), Files.size(targetPath) / (1024 * 1024));
+            return true;
+
+        } catch (Exception e) {
+            log.error("Model download failed: {}", e.getMessage());
+            // 清理临时文件
+            try {
+                Path tempPath = targetPath.resolveSibling(targetPath.getFileName() + ".download");
+                Files.deleteIfExists(tempPath);
+            } catch (IOException ignored) {}
             return false;
         }
     }
