@@ -5,6 +5,8 @@ import cn.edu.cuc.class10.entity.Word;
 import cn.edu.cuc.class10.entity.WordType;
 import cn.edu.cuc.class10.repository.InteractionRepository;
 import cn.edu.cuc.class10.service.WordService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +18,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/words")
 public class WordController {
+
+    private static final Logger logger = LoggerFactory.getLogger(WordController.class);
 
     @Autowired
     private WordService wordService;
@@ -235,6 +239,137 @@ public class WordController {
         }
 
         return result;
+    }
+
+    /**
+     * 在线查询单词的中文释义（调用有道词典）
+     * 用于 OCR 照片识词时自动补充翻译
+     * GET /api/words/translate?word=frog
+     */
+    @GetMapping("/translate")
+    public Map<String, Object> translateWord(@RequestParam String word) {
+        Map<String, Object> result = new HashMap<>();
+        if (word == null || word.trim().isEmpty()) {
+            result.put("code", 400);
+            result.put("message", "单词不能为空");
+            return result;
+        }
+
+        try {
+            String cleanWord = word.trim().toLowerCase().replaceAll("\\s+", " ");
+
+            // 调用有道词典 suggest API（免费，无需 Key）
+            String urlStr = "https://dict.youdao.com/suggest?q="
+                    + java.net.URLEncoder.encode(cleanWord, "UTF-8")
+                    + "&num=1&doctype=json&vendor=web";
+
+            java.net.URL url = new java.net.URL(urlStr);
+            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+
+            int responseCode = conn.getResponseCode();
+            if (responseCode != 200) {
+                result.put("code", 502);
+                result.put("message", "在线词典服务暂不可用");
+                return result;
+            }
+
+            String jsonResponse = new String(
+                    conn.getInputStream().readAllBytes(),
+                    java.nio.charset.StandardCharsets.UTF_8);
+
+            // 解析 JSON 提取释义
+            com.fasterxml.jackson.databind.ObjectMapper mapper =
+                    new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(jsonResponse);
+
+            String translation = "";
+            String phonetic = "";
+            String partOfSpeech = "";
+
+            com.fasterxml.jackson.databind.JsonNode entries = root.path("data").path("entries");
+            if (entries.isArray() && entries.size() > 0) {
+                String explain = entries.get(0).path("explain").asText("");
+                String entry = entries.get(0).path("entry").asText("");
+
+                // 解析释义，格式如 "n. 蛙，青蛙；... " → 提取中文部分
+                if (!explain.isEmpty()) {
+                    // 提取词性（如 "n."、"v."、"adj." 等）
+                    java.util.regex.Matcher posMatcher =
+                            java.util.regex.Pattern.compile("^([a-zA-Z]+\\.\\s*)").matcher(explain);
+                    if (posMatcher.find()) {
+                        partOfSpeech = posMatcher.group(1).replace(".", "").trim().toUpperCase();
+                        // 如果词性映射表里有对应值则映射
+                        partOfSpeech = mapPosAbbreviation(partOfSpeech);
+                    }
+
+                    // 提取中文（去掉词性前缀，取第一个分号/句号前的内容作为简短释义）
+                    String chinesePart = explain.replaceAll("^[a-zA-Z]+\\.\\s*", "");
+                    // 取第一个句号或分号前的内容
+                    int dotIdx = chinesePart.indexOf("。");
+                    int semiIdx = chinesePart.indexOf("；");
+                    int commaIdx = chinesePart.indexOf("，");
+                    int endIdx = -1;
+                    if (dotIdx > 0) endIdx = dotIdx;
+                    if (semiIdx > 0 && (endIdx < 0 || semiIdx < endIdx)) endIdx = semiIdx;
+                    if (commaIdx > 0 && (endIdx < 0 || commaIdx < endIdx)) endIdx = commaIdx;
+                    if (endIdx > 0) {
+                        translation = chinesePart.substring(0, endIdx);
+                    } else {
+                        translation = chinesePart;
+                    }
+                    translation = translation.trim();
+                }
+            }
+
+            if (translation.isEmpty()) {
+                result.put("code", 404);
+                result.put("message", "未找到该单词的释义");
+                return result;
+            }
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("word", cleanWord);
+            data.put("translation", translation);
+            data.put("phonetic", phonetic);
+            data.put("partOfSpeech", partOfSpeech.isEmpty() ? null : partOfSpeech);
+
+            result.put("code", 200);
+            result.put("message", "查询成功");
+            result.put("data", data);
+
+        } catch (java.net.SocketTimeoutException e) {
+            result.put("code", 504);
+            result.put("message", "在线词典查询超时，请检查网络");
+        } catch (Exception e) {
+            logger.warn("Online translate failed for '{}': {}", word, e.getMessage());
+            result.put("code", 502);
+            result.put("message", "在线词典服务暂不可用");
+        }
+        return result;
+    }
+
+    /** 词性缩写映射 */
+    private String mapPosAbbreviation(String abbr) {
+        if (abbr == null) return null;
+        return switch (abbr.toUpperCase()) {
+            case "N" -> "NOUN";
+            case "V" -> "VERB";
+            case "ADJ" -> "ADJECTIVE";
+            case "ADV" -> "ADVERB";
+            case "PREP" -> "PREPOSITION";
+            case "CONJ" -> "CONJUNCTION";
+            case "PRON" -> "PRONOUN";
+            case "INT" -> "INTERJECTION";
+            case "ART" -> "ARTICLE";
+            case "AUX" -> "AUXILIARY";
+            case "NUM" -> "NUMERAL";
+            case "DET" -> "DETERMINER";
+            default -> abbr;
+        };
     }
 
     @GetMapping("/statistics")

@@ -1419,8 +1419,18 @@
                     </div>
                     <el-button v-if="mistakeWords.length > 0" type="primary" :icon="MagicStick" @click="startMistakeReview" round>开始复习</el-button>
                 </div>
-                <div v-if="mistakeWords.length > 0" class="mistake-list">
-                    <div v-for="(mw, mi) in mistakeWords" :key="mi" class="ml-item">
+                <!-- 搜索框 -->
+                <el-card shadow="never" style="border-radius:14px; margin-bottom:16px;">
+                    <el-input v-model="mistakeSearch" placeholder="搜索生词..." clearable
+                        style="max-width:400px;">
+                        <template #prefix><el-icon><Search></Search></el-icon></template>
+                    </el-input>
+                </el-card>
+                <div v-if="mistakeSearch && filteredMistakeWords.length === 0 && mistakeWords.length > 0" style="padding:12px 16px; color:#909399; font-size:13px;">
+                    没有匹配的生词，试试其他关键词
+                </div>
+                <div v-if="filteredMistakeWords.length > 0" class="mistake-list">
+                    <div v-for="(mw, mi) in filteredMistakeWords" :key="mi" class="ml-item">
                         <div class="ml-left" style="flex:1; min-width:0;">
                             <span class="ml-word">{{ mw.word?.content || mw.content }}</span>
                             <span class="ml-trans">{{ mw.word?.translation || mw.translation }}</span>
@@ -1434,10 +1444,15 @@
                         </div>
                     </div>
                 </div>
-                <div v-else class="empty-state-el">
+                <div v-else-if="mistakeWords.length === 0" class="empty-state-el">
                     <div class="empty-icon">🎉</div>
                     <h3>暂无生词</h3>
                     <p>太棒了，你还没有任何生词记录</p>
+                </div>
+                <div v-else-if="mistakeSearch && filteredMistakeWords.length === 0" class="empty-state-el" style="padding:40px;">
+                    <div class="empty-icon">🔍</div>
+                    <h3>未找到匹配的生词</h3>
+                    <p>试试其他关键词</p>
                 </div>
             </template>
 
@@ -1752,13 +1767,13 @@
                                             :color="cand.confidence > 0.7 ? '#67c23a' : cand.confidence > 0.4 ? '#e6a23c' : '#f56c6c'"
                                             style="margin-bottom:6px;" />
 
-                                        <div v-if="cand.matched" style="font-size:13px; color:#666; line-height:1.6;">
+                                        <div style="font-size:13px; color:#666; line-height:1.6;">
                                             <span v-if="cand.translation">📖 {{ cand.translation }}</span>
                                             <span v-if="cand.phonetic" style="margin-left:12px;">🔊 {{ cand.phonetic }}</span>
                                             <span v-if="cand.partOfSpeech" style="margin-left:12px; color:#999;">{{ cand.partOfSpeech }}</span>
                                         </div>
 
-                                        <!-- 手动编辑（仅未匹配的选中候选词） -->
+                                        <!-- 手动编辑（选中的未匹配候选词） -->
                                         <div v-if="selectedCandidate === idx && !cand.matched" style="margin-top:8px;">
                                             <el-input v-model="ocrEditWord" placeholder="编辑单词..." size="small" @click.stop>
                                                 <template #prepend>单词</template>
@@ -1973,6 +1988,9 @@
                     </div>
                 </div>
                 <template #footer>
+                    <el-button type="success" :icon="MagicStick" @click="startStudyWithWord(detailWord)">
+                        📖 去学习
+                    </el-button>
                     <el-button @click="wordDetailVisible = false">关闭</el-button>
                 </template>
             </el-dialog>
@@ -2415,6 +2433,16 @@ const app = createApp({
         const wordlistTitle = ref('词汇列表');
 
         const mistakeWords = ref([]);
+        const mistakeSearch = ref('');
+        const filteredMistakeWords = computed(() => {
+            const q = mistakeSearch.value?.trim().toLowerCase();
+            if (!q) return mistakeWords.value;
+            return mistakeWords.value.filter(m => {
+                const word = (m.word?.content || m.content || '').toLowerCase();
+                const trans = (m.word?.translation || m.translation || '').toLowerCase();
+                return word.includes(q) || trans.includes(q);
+            });
+        });
 
         // ========== 学习计划实时数据 ==========
         const planData = reactive({
@@ -2447,6 +2475,7 @@ const app = createApp({
             else if (view === 'report') loadReport();
             else if (view === 'mistake') loadMistakeWords();
             else if (view === 'study_plan' || view === 'profile') { loadStudyPlan(); loadAvatar(); }
+            else if (view === 'photo_ocr') { clearPhotoUpload(); checkOcrStatus(); }
         }
 
         function toggleSidebar() {
@@ -2647,6 +2676,44 @@ const app = createApp({
                     preloadWordImages(list);
                     // 弹出排序选择对话框
                     showStudyModeDialog.value = true;
+                }
+            } catch (e) {
+                console.error(e);
+                ElementPlus.ElMessage.error('加载失败');
+            }
+        }
+
+        /** 从单词详情点击"去学习"时调用：直接以字典序打开学习卡片 */
+        async function startStudyWithWord(w) {
+            if (!w || !user.value) { ElementPlus.ElMessage.warning('请先登录'); return; }
+            wordDetailVisible.value = false;
+            try {
+                // 根据当前视图的筛选条件加载低熟悉度单词
+                const filterType = studyFilter.value;
+                const res = await axios.get('/api/words/study/lowFamiliarity', {
+                    params: {
+                        userId: user.value.userId,
+                        userPhase: user.value.phase || '',
+                        filterType: filterType
+                    }
+                });
+                if (res.data.code === 200) {
+                    const list = res.data.data || [];
+                    if (list.length === 0) {
+                        ElementPlus.ElMessage.info('没有可学习的单词');
+                        return;
+                    }
+                    // 按字典序排序
+                    list.sort((a, b) => (a.content || '').localeCompare(b.content || ''));
+                    studyWords.value = list;
+                    // 找出当前单词的位置
+                    const foundIdx = list.findIndex(item =>
+                        item.wordId === w.wordId || item.content?.toLowerCase() === w.content?.toLowerCase()
+                    );
+                    studyIndex.value = foundIdx >= 0 ? foundIdx : 0;
+                    studyModeOrder.value = 'alphabetical';
+                    preloadWordImages(list);
+                    studyModalVisible.value = true;
                 }
             } catch (e) {
                 console.error(e);
@@ -3369,6 +3436,16 @@ const app = createApp({
                             ocrEditWord.value = ocrCandidates.value[0].displayName || '';
                         }
                         ocrStatusMsg.value = '';
+
+                        // 联网查释义：对没有翻译的候选词异步查询
+                        for (const cand of ocrCandidates.value) {
+                            if (!cand.matched && !cand.translation) {
+                                const word = cand.displayName || cand.label || '';
+                                if (word) {
+                                    lookupTranslationAsync(cand, word);
+                                }
+                            }
+                        }
                     } else {
                         ocrStatusMsg.value = '😕 未识别到物体，请换一张照片试试';
                         ElementPlus.ElMessage.info('未识别到物体，请换一张照片试试');
@@ -3421,7 +3498,7 @@ const app = createApp({
                 }
 
                 const word = ocrEditWord.value?.trim() || candidate.displayName || candidate.label;
-                const translation = ocrEditTranslation.value?.trim() || '';
+                const translation = ocrEditTranslation.value?.trim() || candidate.translation || '';
 
                 const res = await axios.post('/api/ocr/add-word', {
                     word: word,
@@ -3430,11 +3507,38 @@ const app = createApp({
                 });
 
                 if (res.data.code === 200) {
-                    ElementPlus.ElMessage.success(`✅ "${word}" 已添加到词库`);
                     ocrCandidates.value = [];
                     selectedCandidate.value = null;
                     ocrEditWord.value = '';
                     ocrEditTranslation.value = '';
+
+                    // 弹出跳转确认对话框
+                    ElementPlus.ElMessageBox.confirm(
+                        '该词已加入自建词汇表，可以前往自建词汇表补充详细信息',
+                        '✅ 添加成功',
+                        {
+                            confirmButtonText: '立刻跳转',
+                            cancelButtonText: '不用了',
+                            type: 'success',
+                            distinguishCancelAndClose: true
+                        }
+                    ).then(async () => {
+                        // 用户点击 "立刻跳转"
+                        switchView('study');
+                        studyFilter.value = 'CUSTOM';
+                        studySearch.value = word;
+                        currentPage.value = 1;
+                        await loadWords();
+                        // 查找该单词在列表中的位置，跳转到对应页码
+                        const idx = words.value.findIndex(w =>
+                            w.content?.toLowerCase() === word.toLowerCase()
+                        );
+                        if (idx >= 0) {
+                            currentPage.value = Math.floor(idx / pageSize) + 1;
+                        }
+                    }).catch(() => {
+                        // 用户点击 "不用了" 或关闭对话框，什么都不做
+                    });
                 } else {
                     ElementPlus.ElMessage.error(res.data.message || '添加失败');
                 }
@@ -3490,6 +3594,44 @@ const app = createApp({
             ocrStatusMsg.value = '';
             if (photoFileInput.value) photoFileInput.value.value = '';
         }
+
+        /** 联网查单词释义（异步，不影响识别速度） */
+        async function lookupTranslationAsync(cand, word) {
+            try {
+                const res = await axios.get('/api/words/translate', {
+                    params: { word: word },
+                    timeout: 8000
+                });
+                if (res.data.code === 200 && res.data.data) {
+                    cand.translation = res.data.data.translation;
+                    cand.phonetic = res.data.data.phonetic || cand.phonetic;
+                    cand.partOfSpeech = res.data.data.partOfSpeech || cand.partOfSpeech;
+                    // 如果当前选中的就是这个词，同时更新编辑框
+                    if (selectedCandidate.value !== null &&
+                        ocrCandidates.value[selectedCandidate.value] === cand) {
+                        ocrEditTranslation.value = cand.translation || '';
+                    }
+                }
+            } catch (e) {
+                // 静默失败（联网查词只是锦上添花）
+                console.log('Online translate unavailable for:', word);
+            }
+        }
+
+        // 选中候选词时自动填充编辑框
+        watch(selectedCandidate, (newIdx) => {
+            if (newIdx === null || !ocrCandidates.value[newIdx]) {
+                return;
+            }
+            const cand = ocrCandidates.value[newIdx];
+            ocrEditWord.value = cand.displayName || cand.label || '';
+            // 如果后端返回了参考释义，自动填入（用户可修改）
+            if (cand.translation && !cand.matched) {
+                ocrEditTranslation.value = cand.translation;
+            } else {
+                ocrEditTranslation.value = '';
+            }
+        });
 
         // ========== 学习计划 ==========
         const todayProgress = computed(() => {
@@ -3715,7 +3857,7 @@ const app = createApp({
             studyModalVisible, studyWords, studyIndex, studyWord,
             studyWordImageUrl, studyWordImageLoading,
             showStudyModeDialog, studyModeOrder,
-            startStudyMode, confirmStartStudyMode, handleStudyFeedback, studyWordDetail,
+            startStudyMode, startStudyWithWord, confirmStartStudyMode, handleStudyFeedback, studyWordDetail,
             prevWord, nextWord,
 
             // 测试
@@ -3746,14 +3888,14 @@ const app = createApp({
             ocrRecognizing, ocrCandidates, selectedCandidate, ocrEditWord, ocrEditTranslation, ocrAdding,
             ocrModelStatus, ocrModelError, ocrManualWord, ocrManualTranslation, ocrStatusMsg,
             triggerPhotoUpload, handlePhotoFileChange, handlePhotoDrop,
-            startPhotoRecognition, clearPhotoUpload, checkOcrStatus,
+            startPhotoRecognition, clearPhotoUpload, lookupTranslationAsync, checkOcrStatus,
             addOcrWordToLibrary, addManualWord,
 
             // 学习计划
             planData, loadStudyPlan, todayProgress, masteryRate, studyTips,
 
             // 生词本
-            mistakeWords,
+            mistakeWords, mistakeSearch, filteredMistakeWords,
 
             // 生词本复习
             mistakeReviewActive, mistakeReviewWords, mistakeReviewIndex, mistakeReviewWord,

@@ -616,7 +616,7 @@ public class OcrService {
 
     /**
      * 在 words 表中搜索与识别标签匹配的单词
-     * 匹配策略：精确匹配 → 分词匹配 → 模糊搜索
+     * 匹配策略：仅精确匹配。若有任何不同，标记为未匹配，交由前端联网查询。
      */
     private void searchWordInDatabase(RecognitionResult result, String displayName) {
         if (displayName == null || displayName.isEmpty()) {
@@ -624,43 +624,13 @@ public class OcrService {
             return;
         }
 
-        // 策略1: 精确匹配（case-insensitive）
+        // 仅精确匹配（case-insensitive），若有任何不同则交由前端联网查询
         Optional<Word> exactMatch = wordRepository.findByContent(displayName);
         if (exactMatch.isPresent()) {
             fillMatchedWord(result, exactMatch.get());
-            return;
+        } else {
+            result.setMatched(false);
         }
-
-        // 策略2: 对标签中的每个单词独立搜索（如 "tree frog" → 搜索 "tree" 和 "frog"）
-        String[] parts = displayName.split("\\s+");
-        for (String part : parts) {
-            if (part.length() < 3) continue;
-            Optional<Word> partMatch = wordRepository.findByContent(part);
-            if (partMatch.isPresent()) {
-                fillMatchedWord(result, partMatch.get());
-                return;
-            }
-        }
-
-        // 策略3: 模糊搜索包含该标签的单词
-        List<Word> fuzzyMatches = wordRepository.findByContentContainingIgnoreCase(displayName);
-        if (!fuzzyMatches.isEmpty()) {
-            fillMatchedWord(result, fuzzyMatches.get(0));
-            return;
-        }
-
-        // 策略4: 分词模糊搜索
-        for (String part : parts) {
-            if (part.length() < 3) continue;
-            List<Word> partFuzzyMatches = wordRepository.findByContentContainingIgnoreCase(part);
-            if (!partFuzzyMatches.isEmpty()) {
-                fillMatchedWord(result, partFuzzyMatches.get(0));
-                return;
-            }
-        }
-
-        // 未匹配
-        result.setMatched(false);
     }
 
     private void fillMatchedWord(RecognitionResult result, Word word) {
