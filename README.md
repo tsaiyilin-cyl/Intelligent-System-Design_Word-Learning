@@ -2,7 +2,7 @@
 终端执行
 
 .\mvnw.cmd spring-boot:run
-
+    
 启动服务成功后，打开浏览器输入网址访问：
 
 http://localhost:8080
@@ -42,3 +42,32 @@ java -jar class10.war
 # 开发者事项
 
 对项目进行修改之后，务必做好审查并在update.md中按照原有格式添加修改
+
+# 照片识词模块（OCR）
+
+项目新增了照片识词功能，依赖于 ImageNet-21k 预训练模型文件（~392 MB）。
+
+## 模型文件获取方式（二选一）
+
+### 方式 A：运行导出脚本（推荐）
+```bash
+pip install torch timm
+python export_in21k_model.py
+```
+脚本会自动下载权重并导出到 `ocr-models/vit_base_in21k.pt`。
+
+### 方式 B：从共享链接下载
+联系项目维护者获取模型文件，放到：
+```
+ocr-models/vit_base_in21k.pt
+```
+
+## .gitignore 说明
+
+以下目录**不会**提交到 GitHub，新增 clone 项目的成员需自行准备：
+
+| 目录 | 内容 | 原因 |
+|------|------|------|
+| `ocr-models/` | OCR 模型文件 (~392 MB) | 超 GitHub 100 MB 限制 |
+| `word-images/` | 单词配图缓存 (~900 MB) | 用户数据，无需版本控制 |
+

@@ -67,6 +67,41 @@
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- DJL 核心API -->
+        <dependency>
+            <groupId>ai.djl</groupId>
+            <artifactId>api</artifactId>
+            <version>0.31.0</version>
+        </dependency>
+
+        <!-- DJL PyTorch 引擎（模型加载与推理） -->
+        <dependency>
+            <groupId>ai.djl.pytorch</groupId>
+            <artifactId>pytorch-engine</artifactId>
+            <version>0.31.0</version>
+        </dependency>
+
+        <!-- DJL 模型仓库（内置预训练模型自动下载） -->
+        <dependency>
+            <groupId>ai.djl</groupId>
+            <artifactId>model-zoo</artifactId>
+            <version>0.31.0</version>
+        </dependency>
+
+        <!-- DJL 基础视觉处理（图片读取与变换） -->
+        <dependency>
+            <groupId>ai.djl</groupId>
+            <artifactId>basicdataset</artifactId>
+            <version>0.31.0</version>
+        </dependency>
+
+        <!-- PyTorch 模型 zoo（包含模型定义元数据） -->
+        <dependency>
+            <groupId>ai.djl.pytorch</groupId>
+            <artifactId>pytorch-model-zoo</artifactId>
+            <version>0.31.0</version>
+        </dependency>
     </dependencies>
 
     <build>

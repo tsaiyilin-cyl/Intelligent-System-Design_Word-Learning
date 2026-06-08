@@ -25,6 +25,7 @@
             box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
         }
         .header h1 { color: #667eea; font-size: 22px; }
+        .header-right { display: flex; align-items: center; gap: 12px; }
         .back-btn {
             background: #667eea;
             color: white;
@@ -35,6 +36,14 @@
             transition: background 0.3s;
         }
         .back-btn:hover { background: #5a6fd6; }
+        .model-status {
+            font-size: 12px;
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+        .model-status.ok { background: #e8f5e9; color: #2e7d32; }
+        .model-status.loading { background: #fff3e0; color: #e65100; }
+        .model-status.error { background: #ffebee; color: #c62828; }
 
         .main-card {
             background: white;
@@ -142,29 +151,97 @@
             border: 2px solid #667eea;
         }
         .btn-outline:hover { background: #f0f2ff; }
+        .btn-success {
+            background: #67c23a;
+            color: white;
+        }
+        .btn-success:hover { background: #5daf34; }
+        .btn-success:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .result-section { margin-top: 4px; }
-        .result-section label {
-            display: block;
-            font-size: 14px;
-            font-weight: 600;
-            color: #444;
-            margin-bottom: 8px;
-        }
-        .result-box {
-            width: 100%;
-            height: 140px;
+        .candidate-card {
+            padding: 14px 18px;
+            border: 2px solid #e8e8e8;
             border-radius: 10px;
-            border: 1px solid #e8e8e8;
-            padding: 12px 14px;
-            font-size: 14px;
-            line-height: 1.6;
-            resize: vertical;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.25s;
             background: #fafbfd;
-            color: #333;
-            transition: border-color 0.3s;
         }
-        .result-box:focus { outline: none; border-color: #667eea; background: white; }
+        .candidate-card:hover { border-color: #667eea; background: #f5f7ff; }
+        .candidate-card.selected { border-color: #667eea; background: #f0f2ff; }
+        .candidate-card .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            background: transparent;
+            box-shadow: none;
+            padding: 0;
+            border-radius: 0;
+        }
+        .candidate-card .header .name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #303133;
+        }
+        .candidate-card .header .confidence {
+            font-size: 12px;
+            color: #999;
+        }
+        .confidence-bar {
+            height: 6px;
+            border-radius: 3px;
+            background: #e8e8e8;
+            margin-bottom: 6px;
+            overflow: hidden;
+        }
+        .confidence-bar .fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.5s;
+        }
+        .tag {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-left: 6px;
+        }
+        .tag-success { background: #e8f5e9; color: #2e7d32; }
+        .tag-warning { background: #fff3e0; color: #e65100; }
+
+        .file-name {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 12px;
+            word-break: break-all;
+        }
+        .file-name span { color: #667eea; font-weight: 600; }
+
+        .edit-input {
+            width: 100%;
+            margin-top: 8px;
+            padding: 8px 12px;
+            border: 1px solid #d0d5e0;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        .edit-input:focus { outline: none; border-color: #667eea; }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
 
         .tip-bar {
             margin-top: 20px;
@@ -183,28 +260,18 @@
             font-size: 12px;
         }
 
-        .file-name {
+        .alert {
+            padding: 12px 16px;
+            border-radius: 10px;
             font-size: 13px;
-            color: #888;
-            margin-bottom: 12px;
-            word-break: break-all;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        .file-name span { color: #667eea; font-weight: 600; }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        .loading-spinner {
-            display: inline-block;
-            width: 18px;
-            height: 18px;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-top-color: white;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            vertical-align: middle;
-            margin-right: 6px;
-        }
+        .alert-info { background: #e3f2fd; color: #1565c0; border-left: 4px solid #1976d2; }
+        .alert-success { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #43a047; }
+        .alert-error { background: #ffebee; color: #c62828; border-left: 4px solid #e53935; }
 
         @media (max-width: 768px) {
             .upload-zone { flex-direction: column; }
@@ -217,8 +284,13 @@
 <div class="container">
     <div class="header">
         <h1>📷 照片识词</h1>
-        <a href="/dashboard.html" class="back-btn">← 返回首页</a>
+        <div class="header-right">
+            <span class="model-status" id="modelStatus">检查中…</span>
+            <a href="/dashboard.html" class="back-btn">← 返回首页</a>
+        </div>
     </div>
+
+    <div id="modelAlert"></div>
 
     <div class="main-card">
         <div class="card-banner">
@@ -228,7 +300,7 @@
 
         <div class="card-body">
             <div class="upload-zone">
-                <div class="preview-area" id="imgPreview" onclick="document.getElementById('fileInput').click()">
+                <div class="preview-area" id="imgPreview">
                     <div class="preview-placeholder" id="placeholder">
                         <div class="icon">🖼️</div>
                         <p>点击或拖拽图片到此处</p>
@@ -254,34 +326,63 @@
                         <button class="btn btn-outline" id="clearBtn">🗑️ 清除</button>
                     </div>
 
-                    <div class="result-section">
-                        <label>🏷️ 识别结果</label>
-                        <textarea class="result-box" id="ocrResult" placeholder="识别结果将在这里显示…&#10;&#10;上传照片后点击'开始识别'即可查看" readonly></textarea>
+                    <!-- 识别结果候选区 -->
+                    <div id="candidatesArea" style="display:none; margin-bottom: 16px;"></div>
+
+                    <!-- 加入词库按钮 -->
+                    <div id="addWordSection" style="display:none;">
+                        <button class="btn btn-success" id="addWordBtn" disabled>✅ 加入词库</button>
+                    </div>
+
+                    <!-- 手动输入（模型不可用时） -->
+                    <div id="manualSection" style="display:none; margin-bottom: 16px;">
+                        <label style="display:block; font-size:14px; font-weight:600; color:#444; margin-bottom:8px;">✏️ 手动输入单词</label>
+                        <input type="text" id="manualWord" class="edit-input" placeholder="输入英文单词" />
+                        <input type="text" id="manualTranslation" class="edit-input" style="margin-top:6px;" placeholder="输入中文释义（可选）" />
+                        <button class="btn btn-success" id="manualAddBtn" style="margin-top:8px;">📚 添加到词库</button>
                     </div>
                 </div>
             </div>
 
-            <div class="tip-bar">
-                💡 <strong>提示：</strong>此页面为前端示意，暂未接入真实 OCR 服务。
-                后端建议接口：<code>/api/ocr</code>（multipart/form-data），返回识别到的物体名称列表。
-                接入后可自动翻译并支持一键添加到词汇库。
+            <div class="tip-bar" id="tipBar">
+                💡 <strong>提示：</strong>上传照片后点击「开始识别」，系统将自动识别物体并推荐对应英文单词。识别结果会在上方展示，点击候选词卡片可选中，点击「加入词库」一键添加。
             </div>
         </div>
     </div>
 </div>
 
 <script>
+    // ========== DOM 引用 ==========
     const fileInput = document.getElementById('fileInput');
     const imgPreview = document.getElementById('imgPreview');
     const placeholder = document.getElementById('placeholder');
     const recognizeBtn = document.getElementById('recognizeBtn');
     const clearBtn = document.getElementById('clearBtn');
-    const ocrResult = document.getElementById('ocrResult');
     const fileNameDiv = document.getElementById('fileName');
     const fileNameText = document.getElementById('fileNameText');
     const fileText = document.getElementById('fileText');
-    let currentFile = null;
+    const candidatesArea = document.getElementById('candidatesArea');
+    const addWordSection = document.getElementById('addWordSection');
+    const addWordBtn = document.getElementById('addWordBtn');
+    const manualSection = document.getElementById('manualSection');
+    const manualWord = document.getElementById('manualWord');
+    const manualTranslation = document.getElementById('manualTranslation');
+    const manualAddBtn = document.getElementById('manualAddBtn');
+    const modelStatusEl = document.getElementById('modelStatus');
+    const modelAlert = document.getElementById('modelAlert');
+    const tipBar = document.getElementById('tipBar');
 
+    // ========== 状态 ==========
+    let currentFile = null;
+    let ocrCandidates = [];
+    let selectedIndex = null;
+    let modelReady = false;
+    let modelError = '';
+    let modelChecked = false;
+
+    // ========== 事件绑定 ==========
+
+    // 拖拽上传
     imgPreview.addEventListener('dragover', (e) => {
         e.preventDefault();
         imgPreview.classList.add('dragover');
@@ -297,12 +398,60 @@
             handleFile(f);
         }
     });
+    // 点击预览区触发文件选择
+    imgPreview.addEventListener('click', () => fileInput.click());
 
     fileInput.addEventListener('change', (e) => {
         const f = e.target.files[0];
         if (f) handleFile(f);
     });
 
+    recognizeBtn.addEventListener('click', startRecognition);
+    clearBtn.addEventListener('click', clearAll);
+    addWordBtn.addEventListener('click', addWordToLibrary);
+    manualAddBtn.addEventListener('click', addManualWord);
+
+    // ========== 模型状态检查 ==========
+    async function checkModelStatus() {
+        try {
+            const res = await fetch('/api/ocr/status');
+            const data = await res.json();
+            modelChecked = true;
+            if (data.code === 200 && data.data) {
+                if (data.data.modelReady) {
+                    modelReady = true;
+                    modelStatusEl.textContent = '模型就绪';
+                    modelStatusEl.className = 'model-status ok';
+                    modelAlert.innerHTML = '';
+                } else if (data.data.modelError) {
+                    modelReady = false;
+                    modelError = data.data.modelError;
+                    modelStatusEl.textContent = '模型异常';
+                    modelStatusEl.className = 'model-status error';
+                    modelAlert.innerHTML = '<div class="alert alert-error">⚠️ ' + data.data.modelError + '</div>';
+                    manualSection.style.display = 'block';
+                    tipBar.innerHTML = '💡 <strong>提示：</strong>模型不可用，您可以手动输入单词添加到词库。';
+                } else {
+                    modelReady = false;
+                    modelStatusEl.textContent = '加载中…';
+                    modelStatusEl.className = 'model-status loading';
+                    modelAlert.innerHTML = '<div class="alert alert-info">⏳ 图像识别模型正在加载，首次加载需下载模型文件（约 100MB），请耐心等待…</div>';
+                }
+            }
+        } catch (e) {
+            modelChecked = true;
+            modelReady = false;
+            modelError = '无法连接识别服务';
+            modelStatusEl.textContent = '服务异常';
+            modelStatusEl.className = 'model-status error';
+            modelAlert.innerHTML = '<div class="alert alert-error">⚠️ 无法连接识别服务，请检查后端是否启动</div>';
+        }
+    }
+
+    // 页面加载时检查
+    checkModelStatus();
+
+    // ========== 文件处理 ==========
     function handleFile(f) {
         currentFile = f;
         const url = URL.createObjectURL(f);
@@ -311,34 +460,287 @@
         img.src = url;
         imgPreview.appendChild(img);
         recognizeBtn.disabled = false;
-        ocrResult.value = '';
         fileNameDiv.style.display = 'block';
         fileNameText.textContent = f.name;
         fileText.textContent = f.name;
+        // 清除之前的结果
+        clearResults();
     }
 
-    recognizeBtn.addEventListener('click', () => {
+    // ========== 识别 ==========
+    async function startRecognition() {
         if (!currentFile) return;
+
         recognizeBtn.disabled = true;
         recognizeBtn.innerHTML = '<span class="loading-spinner"></span>识别中…';
-        setTimeout(() => {
-            ocrResult.value = `（示意）已上传文件：${currentFile.name}\n文件大小：${Math.round(currentFile.size / 1024)} KB\n\n示例识别文本：\n- example  示例\n- test  测试\n- photo  照片`;
+        clearResults();
+
+        try {
+            const formData = new FormData();
+            formData.append('file', currentFile);
+
+            // 从 URL 参数或 localStorage 获取 userId
+            const params = new URLSearchParams(window.location.search);
+            const userId = params.get('userId') || localStorage.getItem('ocrUserId');
+            if (userId) {
+                formData.append('userId', userId);
+            }
+
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 30000);
+
+            const res = await fetch('/api/ocr/recognize', {
+                method: 'POST',
+                body: formData,
+                signal: controller.signal
+            });
+            clearTimeout(timeout);
+
+            const data = await res.json();
+
+            if (data.code === 200 && data.data && data.data.length > 0) {
+                ocrCandidates = data.data;
+                renderCandidates();
+                addWordSection.style.display = 'block';
+                candidatesArea.style.display = 'block';
+                if (data.data.length > 0) {
+                    selectCandidate(0);
+                }
+            } else if (data.code === 200) {
+                candidatesArea.innerHTML = '<div class="alert alert-info">未识别到物体，请换一张照片试试</div>';
+                candidatesArea.style.display = 'block';
+            } else {
+                alert('识别失败：' + (data.message || '未知错误'));
+            }
+        } catch (e) {
+            if (e.name === 'AbortError') {
+                alert('识别超时，请检查模型是否已加载');
+            } else {
+                console.error('Recognition error:', e);
+                try {
+                    const errData = await e.response?.json?.();
+                    alert('识别失败：' + (errData?.message || '网络错误'));
+                } catch (_) {
+                    alert('识别请求失败，请检查服务是否正常运行');
+                }
+            }
+        } finally {
             recognizeBtn.innerHTML = '🔍 开始识别';
             recognizeBtn.disabled = false;
-        }, 1200);
-    });
+        }
+    }
 
-    clearBtn.addEventListener('click', () => {
+    // ========== 候选词渲染 ==========
+    function renderCandidates() {
+        candidatesArea.innerHTML = '';
+        ocrCandidates.forEach((cand, idx) => {
+            const card = document.createElement('div');
+            card.className = 'candidate-card';
+            card.dataset.index = idx;
+            card.onclick = () => selectCandidate(idx);
+
+            const pct = Math.round(cand.confidence * 100);
+            const barColor = cand.confidence > 0.7 ? '#67c23a' : cand.confidence > 0.4 ? '#e6a23c' : '#f56c6c';
+            const tagHtml = cand.matched
+                ? '<span class="tag tag-success">✅ 已收录</span>'
+                : '<span class="tag tag-warning">🆕 新词</span>';
+
+            let detailHtml = '';
+            if (cand.matched) {
+                detailHtml = '<div style="font-size:13px; color:#666; line-height:1.6; margin-top:4px;">';
+                if (cand.translation) detailHtml += '📖 ' + cand.translation + ' ';
+                if (cand.phonetic) detailHtml += '🔊 ' + cand.phonetic;
+                if (cand.partOfSpeech) detailHtml += '<span style="color:#999; margin-left:8px;">' + cand.partOfSpeech + '</span>';
+                detailHtml += '</div>';
+            } else {
+                detailHtml = '<div class="edit-area" data-index="' + idx + '" style="display:none; margin-top:8px;">' +
+                    '<input type="text" class="edit-input word-input" placeholder="编辑单词..." value="' + escHtml(cand.displayName || '') + '" />' +
+                    '<input type="text" class="edit-input trans-input" style="margin-top:6px;" placeholder="输入中文释义（可选）" />' +
+                    '</div>';
+            }
+
+            card.innerHTML = '<div class="header">' +
+                '<div><span class="name">' + escHtml(cand.displayName || cand.label) + '</span>' + tagHtml + '</div>' +
+                '<span class="confidence">' + pct + '%</span>' +
+                '</div>' +
+                '<div class="confidence-bar"><div class="fill" style="width:' + pct + '%; background:' + barColor + ';"></div></div>' +
+                detailHtml;
+
+            candidatesArea.appendChild(card);
+        });
+
+        if (selectedIndex !== null) {
+            const cards = candidatesArea.querySelectorAll('.candidate-card');
+            if (cards[selectedIndex]) cards[selectedIndex].classList.add('selected');
+        }
+    }
+
+    function selectCandidate(idx) {
+        selectedIndex = idx;
+        // 更新选中状态
+        const cards = candidatesArea.querySelectorAll('.candidate-card');
+        cards.forEach((c, i) => c.classList.toggle('selected', i === idx));
+
+        // 显示编辑区域
+        cards.forEach((c, i) => {
+            const editArea = c.querySelector('.edit-area');
+            if (editArea) {
+                editArea.style.display = (i === idx) ? 'block' : 'none';
+            }
+        });
+
+        // 启用加入词库按钮
+        addWordBtn.disabled = false;
+    }
+
+    // ========== 加入词库 ==========
+    async function addWordToLibrary() {
+        if (selectedIndex === null || !ocrCandidates[selectedIndex]) return;
+
+        const candidate = ocrCandidates[selectedIndex];
+
+        // 从 URL 参数或 localStorage 获取 userId
+        const params = new URLSearchParams(window.location.search);
+        let userId = params.get('userId') || localStorage.getItem('ocrUserId');
+        if (!userId) {
+            userId = prompt('请输入您的用户 ID（在个人中心查看）：');
+            if (!userId) return;
+            localStorage.setItem('ocrUserId', userId);
+        }
+
+        addWordBtn.disabled = true;
+        addWordBtn.innerHTML = '<span class="loading-spinner"></span>添加中…';
+
+        try {
+            // 如果已匹配到现有单词，不需要添加
+            if (candidate.matched) {
+                alert('✅ 该单词已在词库中');
+                resetAfterAdd();
+                return;
+            }
+
+            // 获取编辑框中的值
+            const card = candidatesArea.querySelectorAll('.candidate-card')[selectedIndex];
+            const wordInput = card?.querySelector('.word-input');
+            const transInput = card?.querySelector('.trans-input');
+            const word = wordInput?.value?.trim() || candidate.displayName || candidate.label || '';
+            const translation = transInput?.value?.trim() || '';
+
+            if (!word) {
+                alert('请输入单词');
+                addWordBtn.disabled = false;
+                addWordBtn.innerHTML = '✅ 加入词库';
+                return;
+            }
+
+            const res = await fetch('/api/ocr/add-word', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    word: word.toLowerCase(),
+                    translation: translation,
+                    userId: userId
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.code === 200) {
+                alert('✅ "' + word + '" 已添加到词库');
+                resetAfterAdd();
+            } else {
+                alert('添加失败：' + (data.message || '未知错误'));
+            }
+        } catch (e) {
+            console.error('Add word error:', e);
+            alert('添加失败，请检查网络连接');
+        } finally {
+            addWordBtn.innerHTML = '✅ 加入词库';
+        }
+    }
+
+    async function addManualWord() {
+        const word = manualWord.value?.trim();
+        if (!word) {
+            alert('请输入要添加的单词');
+            return;
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        let userId = params.get('userId') || localStorage.getItem('ocrUserId');
+        if (!userId) {
+            userId = prompt('请输入您的用户 ID（在个人中心查看）：');
+            if (!userId) return;
+            localStorage.setItem('ocrUserId', userId);
+        }
+
+        const translation = manualTranslation.value?.trim() || '';
+
+        try {
+            manualAddBtn.disabled = true;
+            manualAddBtn.innerHTML = '<span class="loading-spinner"></span>添加中…';
+
+            const res = await fetch('/api/ocr/add-word', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    word: word.toLowerCase(),
+                    translation: translation,
+                    userId: userId
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.code === 200) {
+                alert('✅ "' + word + '" 已添加到词库');
+                manualWord.value = '';
+                manualTranslation.value = '';
+            } else {
+                alert('添加失败：' + (data.message || '未知错误'));
+            }
+        } catch (e) {
+            alert('添加失败，请检查网络连接');
+        } finally {
+            manualAddBtn.disabled = false;
+            manualAddBtn.innerHTML = '📚 添加到词库';
+        }
+    }
+
+    // ========== 工具 ==========
+    function resetAfterAdd() {
+        ocrCandidates = [];
+        selectedIndex = null;
+        addWordSection.style.display = 'none';
+        candidatesArea.style.display = 'none';
+        addWordBtn.disabled = true;
+    }
+
+    function clearResults() {
+        ocrCandidates = [];
+        selectedIndex = null;
+        candidatesArea.innerHTML = '';
+        candidatesArea.style.display = 'none';
+        addWordSection.style.display = 'none';
+        addWordBtn.disabled = true;
+    }
+
+    function clearAll() {
         fileInput.value = null;
         currentFile = null;
         imgPreview.innerHTML = '';
         imgPreview.appendChild(placeholder);
         recognizeBtn.disabled = true;
         recognizeBtn.innerHTML = '🔍 开始识别';
-        ocrResult.value = '';
+        clearResults();
         fileNameDiv.style.display = 'none';
         fileText.textContent = '选择图片文件…';
-    });
+    }
+
+    function escHtml(s) {
+        if (!s) return '';
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
 </script>
 </body>
 </html>

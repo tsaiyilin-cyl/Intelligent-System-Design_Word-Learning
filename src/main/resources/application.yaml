@@ -1,6 +1,10 @@
 spring:
   application:
     name: class10
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
   web:
     resources:
       static-locations: classpath:/static/
@@ -87,3 +91,21 @@ word-images:
     "
     # 每个 Key 的调用上限（Unsplash 免费额度 50 次/小时）
     max-calls-per-key: 50
+
+# ===== OCR 照片识词配置 =====
+ocr:
+  # 模型存储目录（相对于项目根目录）
+  model-directory: ocr-models
+  # 分类标签文件（classpath 路径）
+  labels-file: synset_21k.txt
+  # 推理时返回 top-K 个候选
+  top-k: 5
+  # 最低置信度阈值（低于此值不返回）
+  confidence-threshold: 0.2
+  # TorchScript 模型文件名（不含 .pt 后缀），位于 model-directory 目录
+  # 当前使用 ViT-B/16 在 ImageNet-21k 上预训练的模型（21843 类）
+  model-name: vit_base_in21k
+  # 模型下载地址（文件不存在时自动下载）
+  # 团队共享：将 .pt 文件上传至 GitHub Releases，把 URL 填到此处
+  # 格式: https://github.com/<用户名>/<仓库>/releases/download/<标签>/<文件名>
+  model-url: ""

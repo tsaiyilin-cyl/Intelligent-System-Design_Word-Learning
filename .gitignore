@@ -1,9 +1,9 @@
-AUTO_HELP.md
 target/
-.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
 
+# Maven wrapper jar
+.mvn/wrapper/maven-wrapper.jar
+
+# === IDE ===
 ### STS ###
 .apt_generated
 .classpath
@@ -26,8 +26,19 @@ target/
 /nbdist/
 /.nb-gradle/
 build/
-!**/src/main/**/build/
-!**/src/test/**/build/
 
 ### VS Code ###
 .vscode/
+
+# === Project-specific ===
+
+# OCR 模型文件 (ImageNet-21k, ~392 MB, 远超 GitHub 100MB 限制)
+# 团队成员需自行下载或通过 export_in21k_model.py 生成
+ocr-models/
+
+# 单词配图缓存 (用户上传的图片文件)
+word-images/
+
+# 临时测试图片
+test_*.jpg
+test_*.png

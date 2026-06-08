@@ -1663,6 +1663,27 @@
                     <h2>📷 照片识词</h2>
                     <p>上传或拍摄照片，自动识别画面中的物体并推荐对应英文单词</p>
                 </div>
+
+                <!-- 模型状态提示 -->
+                <el-alert v-if="ocrModelStatus === 'loading'"
+                    title="模型加载中" type="info" show-icon :closable="false" style="margin-bottom:16px;">
+                    <template #default>
+                        <span>图像识别模型正在加载，首次加载需下载模型文件（约 100MB），请耐心等待…</span>
+                    </template>
+                </el-alert>
+                <el-alert v-else-if="ocrModelStatus === 'error'"
+                    :title="'模型加载失败'" type="error" show-icon :closable="false" style="margin-bottom:16px;">
+                    <template #default>
+                        <span>{{ ocrModelError }}。您可以手动输入单词并添加到词库。</span>
+                    </template>
+                </el-alert>
+                <el-alert v-else-if="ocrModelStatus === 'ok'"
+                    title="模型就绪" type="success" show-icon :closable="true" style="margin-bottom:16px;">
+                    <template #default>
+                        <span>图像识别模型已就绪，可以开始识别照片</span>
+                    </template>
+                </el-alert>
+
                 <el-card shadow="never" style="border-radius:14px; overflow:hidden;">
                     <div style="background:var(--gradient); margin:-20px -20px 0 -20px; padding:20px 24px; color:#fff;">
                         <h3 style="font-size:18px; margin-bottom:4px;">📸 拍照识别单词</h3>
@@ -1694,19 +1715,84 @@
                                 <input type="file" ref="photoFileInput" accept="image/*" @change="handlePhotoFileChange" style="display:none;" />
 
                                 <div style="display:flex; gap:10px; margin-bottom:16px;">
-                                    <el-button type="primary" @click="startPhotoRecognition" :disabled="!photoPreview" :loading="photoRecognizing" round>
+                                    <el-button type="primary" @click="startPhotoRecognition" :disabled="!photoPreview || ocrRecognizing" :loading="ocrRecognizing" round>
                                         🔍 开始识别
                                     </el-button>
                                     <el-button @click="clearPhotoUpload" round>🗑️ 清除</el-button>
                                 </div>
 
-                                <div>
-                                    <label style="display:block; font-size:14px; font-weight:600; color:#444; margin-bottom:8px;">🏷️ 识别结果</label>
-                                    <el-input v-model="photoResult" type="textarea" :rows="5" placeholder="上传照片后点击「开始识别」即可查看&#10;&#10;识别结果将在这里显示…" readonly />
+                                <!-- 状态消息 -->
+                                <div v-if="ocrStatusMsg" style="margin-top:12px; padding:10px 14px; border-radius:8px; font-size:13px; line-height:1.5;"
+                                    :style="{ background: ocrStatusMsg.includes('⚠️') || ocrStatusMsg.includes('😕') ? '#fff3e0' : '#e3f2fd', color: ocrStatusMsg.includes('⚠️') || ocrStatusMsg.includes('😕') ? '#e65100' : '#1565c0' }">
+                                    {{ ocrStatusMsg }}
+                                </div>
+
+                                <!-- 识别结果候选区 -->
+                                <div v-if="ocrCandidates.length > 0">
+                                    <label style="display:block; font-size:14px; font-weight:600; color:#444; margin-bottom:8px;">🎯 识别结果（选择要加入词库的单词）</label>
+
+                                    <div v-for="(cand, idx) in ocrCandidates" :key="idx"
+                                         class="candidate-card"
+                                         :class="{ 'candidate-selected': selectedCandidate === idx }"
+                                         @click="selectedCandidate = idx"
+                                         style="padding:12px 16px; border:2px solid #e8e8e8; border-radius:10px; margin-bottom:10px; cursor:pointer; transition:all 0.25s;"
+                                         :style="selectedCandidate === idx ? { borderColor: '#667eea', background: '#f0f2ff' } : { borderColor: '#e8e8e8', background: '#fafbfd' }">
+
+                                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                                            <div style="display:flex; align-items:center; gap:8px;">
+                                                <span style="font-size:16px; font-weight:600; color:#303133;">{{ cand.displayName || cand.label }}</span>
+                                                <el-tag v-if="cand.matched" type="success" size="small" effect="plain">✅ 已收录</el-tag>
+                                                <el-tag v-else type="warning" size="small" effect="plain">🆕 新词</el-tag>
+                                            </div>
+                                            <span style="font-size:12px; color:#999;">{{ (cand.confidence * 100).toFixed(1) }}%</span>
+                                        </div>
+
+                                        <!-- 置信度条 -->
+                                        <el-progress :percentage="Math.round(cand.confidence * 100)" :stroke-width="6"
+                                            :color="cand.confidence > 0.7 ? '#67c23a' : cand.confidence > 0.4 ? '#e6a23c' : '#f56c6c'"
+                                            style="margin-bottom:6px;" />
+
+                                        <div v-if="cand.matched" style="font-size:13px; color:#666; line-height:1.6;">
+                                            <span v-if="cand.translation">📖 {{ cand.translation }}</span>
+                                            <span v-if="cand.phonetic" style="margin-left:12px;">🔊 {{ cand.phonetic }}</span>
+                                            <span v-if="cand.partOfSpeech" style="margin-left:12px; color:#999;">{{ cand.partOfSpeech }}</span>
+                                        </div>
+
+                                        <!-- 手动编辑（仅未匹配的选中候选词） -->
+                                        <div v-if="selectedCandidate === idx && !cand.matched" style="margin-top:8px;">
+                                            <el-input v-model="ocrEditWord" placeholder="编辑单词..." size="small" @click.stop>
+                                                <template #prepend>单词</template>
+                                            </el-input>
+                                            <el-input v-model="ocrEditTranslation" placeholder="输入中文释义（可选）" size="small" style="margin-top:6px;" @click.stop>
+                                                <template #prepend>释义</template>
+                                            </el-input>
+                                        </div>
+                                    </div>
+
+                                    <!-- 加入词库按钮 -->
+                                    <div style="margin-top:16px; display:flex; gap:10px;">
+                                        <el-button type="primary" @click="addOcrWordToLibrary"
+                                            :disabled="selectedCandidate === null" :loading="ocrAdding" round>
+                                            ✅ 加入词库
+                                        </el-button>
+                                        <el-button @click="ocrCandidates = []; selectedCandidate = null;" round>
+                                            🔄 重新识别
+                                        </el-button>
+                                    </div>
+                                </div>
+
+                                <!-- 手动输入模式（模型不可用时的降级方案） -->
+                                <div v-if="ocrModelStatus === 'error' && ocrCandidates.length === 0" style="margin-top:16px;">
+                                    <label style="display:block; font-size:14px; font-weight:600; color:#444; margin-bottom:8px;">✏️ 手动输入单词</label>
+                                    <el-input v-model="ocrManualWord" placeholder="输入识别的英文单词" size="default" style="margin-bottom:8px;" />
+                                    <el-input v-model="ocrManualTranslation" placeholder="输入中文释义" size="default" style="margin-bottom:8px;" />
+                                    <el-button type="primary" @click="addManualWord" round>
+                                        📚 添加到词库
+                                    </el-button>
                                 </div>
 
                                 <div style="margin-top:16px; padding:12px 16px; background:#f5f0ff; border-radius:10px; border-left:4px solid #764ba2; color:#666; font-size:13px; line-height:1.7;">
-                                    💡 <strong>提示：</strong>此页面为前端示意，暂未接入真实 OCR 服务。
+                                    💡 <strong>提示：</strong>点击候选词卡片选择要添加的单词，已收录词会显示绿色标记。
                                 </div>
                             </div>
                         </div>
@@ -3180,9 +3266,23 @@ const app = createApp({
         const photoFileInput = ref(null);
         const photoDragOver = ref(false);
         const photoPreview = ref('');
-        const photoRecognizing = ref(false);
-        const photoResult = ref('');
         const photoFileName = ref('');
+
+        // 识别结果状态
+        const ocrRecognizing = ref(false);
+        const ocrCandidates = ref([]);
+        const selectedCandidate = ref(null);
+        const ocrEditWord = ref('');
+        const ocrEditTranslation = ref('');
+        const ocrAdding = ref(false);
+        const ocrModelStatus = ref('loading'); // 'loading' | 'ok' | 'error'
+        const ocrModelError = ref('');
+        const ocrManualWord = ref('');
+        const ocrManualTranslation = ref('');
+        const ocrStatusMsg = ref('');
+
+        // 页面加载时查询模型状态
+        checkOcrStatus();
 
         function triggerPhotoUpload() {
             photoFileInput.value?.click();
@@ -3204,28 +3304,190 @@ const app = createApp({
             const reader = new FileReader();
             reader.onload = (ev) => { photoPreview.value = ev.target?.result || ''; };
             reader.readAsDataURL(f);
-            photoResult.value = '';
+            ocrCandidates.value = [];
+            selectedCandidate.value = null;
+            ocrEditWord.value = '';
+            ocrEditTranslation.value = '';
+            ocrStatusMsg.value = '';
+        }
+
+        async function checkOcrStatus() {
+            try {
+                const res = await axios.get('/api/ocr/status');
+                const data = res.data;
+                if (data.code === 200 && data.data) {
+                    if (data.data.modelReady) {
+                        ocrModelStatus.value = 'ok';
+                    } else if (data.data.modelError) {
+                        ocrModelStatus.value = 'error';
+                        ocrModelError.value = data.data.modelError;
+                    } else {
+                        ocrModelStatus.value = 'loading';
+                    }
+                }
+            } catch (e) {
+                ocrModelStatus.value = 'error';
+                ocrModelError.value = '无法连接识别服务';
+            }
         }
 
         async function startPhotoRecognition() {
             if (!photoPreview.value) return;
-            photoRecognizing.value = true;
-            photoResult.value = '';
-            // 模拟 OCR 识别
-            await new Promise(resolve => setTimeout(resolve, 1200));
-            const demoResults = [
-                '- apple  苹果\n- book  书\n- computer  电脑\n- tree  树',
-                '- car  汽车\n- house  房子\n- phone  手机\n- flower  花',
-                '- cat  猫\n- dog  狗\n- bird  鸟\n- fish  鱼'
-            ];
-            photoResult.value = '（示意）识别结果：\n' + demoResults[Math.floor(Math.random() * demoResults.length)];
-            photoRecognizing.value = false;
+
+            ocrRecognizing.value = true;
+            ocrCandidates.value = [];
+            selectedCandidate.value = null;
+            ocrEditWord.value = '';
+            ocrEditTranslation.value = '';
+            ocrStatusMsg.value = '⏳ 正在识别中，请稍候…';
+
+            try {
+                const fileInput = photoFileInput.value;
+                if (!fileInput?.files?.[0]) {
+                    ocrStatusMsg.value = '⚠️ 请先选择一张图片';
+                    ocrRecognizing.value = false;
+                    return;
+                }
+
+                const file = fileInput.files[0];
+                const formData = new FormData();
+                formData.append('file', file);
+                if (user.value?.userId) {
+                    formData.append('userId', user.value.userId);
+                }
+
+                const res = await axios.post('/api/ocr/recognize', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                    timeout: 60000
+                });
+
+                if (res.data.code === 200) {
+                    ocrCandidates.value = res.data.data || [];
+                    if (ocrCandidates.value.length > 0) {
+                        selectedCandidate.value = 0;
+                        if (!ocrCandidates.value[0].matched) {
+                            ocrEditWord.value = ocrCandidates.value[0].displayName || '';
+                        }
+                        ocrStatusMsg.value = '';
+                    } else {
+                        ocrStatusMsg.value = '😕 未识别到物体，请换一张照片试试';
+                        ElementPlus.ElMessage.info('未识别到物体，请换一张照片试试');
+                    }
+                } else {
+                    ocrStatusMsg.value = '⚠️ ' + (res.data.message || '识别失败');
+                    ElementPlus.ElMessage.error(res.data.message || '识别失败');
+                }
+            } catch (e) {
+                console.error('Recognition error:', e);
+                console.error('Response:', e.response?.data);
+                // 显示详细错误信息
+                let errMsg = '';
+                if (e.response?.data) {
+                    // 优先使用后端返回的 message
+                    errMsg = e.response.data.message || e.response.data.error || JSON.stringify(e.response.data);
+                } else if (e.code === 'ECONNABORTED') {
+                    errMsg = '识别超时，请检查模型是否已加载';
+                } else if (e.message) {
+                    errMsg = e.message;
+                } else {
+                    errMsg = '请检查服务是否正常运行';
+                }
+                ocrStatusMsg.value = '⚠️ ' + errMsg;
+                ElementPlus.ElMessage.error(errMsg);
+            } finally {
+                ocrRecognizing.value = false;
+            }
+        }
+
+        async function addOcrWordToLibrary() {
+            if (selectedCandidate.value === null) return;
+
+            const candidate = ocrCandidates.value[selectedCandidate.value];
+            if (!candidate) return;
+
+            if (!user.value?.userId) {
+                ElementPlus.ElMessage.warning('请先登录');
+                return;
+            }
+
+            ocrAdding.value = true;
+
+            try {
+                if (candidate.matched) {
+                    ElementPlus.ElMessage.success('该单词已在词库中');
+                    ocrCandidates.value = [];
+                    selectedCandidate.value = null;
+                    return;
+                }
+
+                const word = ocrEditWord.value?.trim() || candidate.displayName || candidate.label;
+                const translation = ocrEditTranslation.value?.trim() || '';
+
+                const res = await axios.post('/api/ocr/add-word', {
+                    word: word,
+                    translation: translation,
+                    userId: user.value.userId
+                });
+
+                if (res.data.code === 200) {
+                    ElementPlus.ElMessage.success(`✅ "${word}" 已添加到词库`);
+                    ocrCandidates.value = [];
+                    selectedCandidate.value = null;
+                    ocrEditWord.value = '';
+                    ocrEditTranslation.value = '';
+                } else {
+                    ElementPlus.ElMessage.error(res.data.message || '添加失败');
+                }
+            } catch (e) {
+                console.error('Add word error:', e);
+                ElementPlus.ElMessage.error(e.response?.data?.message || '添加失败');
+            } finally {
+                ocrAdding.value = false;
+            }
+        }
+
+        async function addManualWord() {
+            const word = ocrManualWord.value?.trim();
+            if (!word) {
+                ElementPlus.ElMessage.warning('请输入要添加的单词');
+                return;
+            }
+            if (!user.value?.userId) {
+                ElementPlus.ElMessage.warning('请先登录');
+                return;
+            }
+
+            const translation = ocrManualTranslation.value?.trim() || '';
+
+            try {
+                const res = await axios.post('/api/ocr/add-word', {
+                    word: word.toLowerCase(),
+                    translation: translation,
+                    userId: user.value.userId
+                });
+
+                if (res.data.code === 200) {
+                    ElementPlus.ElMessage.success(`✅ "${word}" 已添加到词库`);
+                    ocrManualWord.value = '';
+                    ocrManualTranslation.value = '';
+                } else {
+                    ElementPlus.ElMessage.error(res.data.message || '添加失败');
+                }
+            } catch (e) {
+                ElementPlus.ElMessage.error(e.response?.data?.message || '添加失败');
+            }
         }
 
         function clearPhotoUpload() {
             photoPreview.value = '';
-            photoResult.value = '';
             photoFileName.value = '';
+            ocrCandidates.value = [];
+            selectedCandidate.value = null;
+            ocrEditWord.value = '';
+            ocrEditTranslation.value = '';
+            ocrManualWord.value = '';
+            ocrManualTranslation.value = '';
+            ocrStatusMsg.value = '';
             if (photoFileInput.value) photoFileInput.value.value = '';
         }
 
@@ -3480,8 +3742,12 @@ const app = createApp({
             openEditProfile, saveProfile,
 
             // 照片识词
-            photoFileInput, photoDragOver, photoPreview, photoRecognizing, photoResult, photoFileName,
-            triggerPhotoUpload, handlePhotoFileChange, handlePhotoDrop, startPhotoRecognition, clearPhotoUpload,
+            photoFileInput, photoDragOver, photoPreview, photoFileName,
+            ocrRecognizing, ocrCandidates, selectedCandidate, ocrEditWord, ocrEditTranslation, ocrAdding,
+            ocrModelStatus, ocrModelError, ocrManualWord, ocrManualTranslation, ocrStatusMsg,
+            triggerPhotoUpload, handlePhotoFileChange, handlePhotoDrop,
+            startPhotoRecognition, clearPhotoUpload, checkOcrStatus,
+            addOcrWordToLibrary, addManualWord,
 
             // 学习计划
             planData, loadStudyPlan, todayProgress, masteryRate, studyTips,
