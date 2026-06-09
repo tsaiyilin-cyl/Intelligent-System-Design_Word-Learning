@@ -28,9 +28,36 @@ public class UserDataInitializer implements CommandLineRunner {
             return;
         }
 
+        // 1. 创建默认 admin 用户
+        createAdminUser();
+
+        // 2. 生成模拟用户
         System.out.println("开始生成50条模拟用户数据...");
         generateMockUsers(50);
         System.out.println("模拟用户数据生成完成！");
+    }
+
+    /**
+     * 创建默认管理员账户 (admin / 123456)
+     */
+    private void createAdminUser() {
+        if (userRepository.findByUsername("admin").isPresent()) {
+            System.out.println("admin 用户已存在，跳过创建");
+            return;
+        }
+
+        User admin = new User();
+        admin.setUsername("admin");
+        admin.setPassword("123456");
+        admin.setPhase("senior");
+        admin.setUserType("memory");
+        admin.setDailyGoal(20);
+        admin.setTotalWords(0);
+        admin.setMasteredWords(0);
+        admin.setStudyStreak(0);
+        admin.setLastStudyDate(null);
+        userRepository.save(admin);
+        System.out.println("admin 用户创建完成 (admin / 123456)");
     }
 
     /**

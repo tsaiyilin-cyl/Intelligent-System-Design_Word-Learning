@@ -98,7 +98,7 @@ study-tip:
   llm:
     # API 基础地址（DeepSeek 示例）
     base-url: "https://llm-api.net/v1/chat/completions"
-    # API Key（为空时不调用 LLM，直接使用预设建议）
+    # API Key
     api-key: "sk-r81yU0O4VqTLI0dq178017EXgNfLAQ3zG6ykdyn3yDuiEKEh"
     # 模型名称
     model: "deepseek-v4-flash"
