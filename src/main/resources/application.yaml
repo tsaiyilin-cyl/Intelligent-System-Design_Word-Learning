@@ -92,6 +92,21 @@ word-images:
     # 每个 Key 的调用上限（Unsplash 免费额度 50 次/小时）
     max-calls-per-key: 50
 
+# ===== 学习建议 LLM 配置 =====
+# 使用大模型生成个性化学习建议，兼容 OpenAI / DeepSeek 格式
+study-tip:
+  llm:
+    # API 基础地址（DeepSeek 示例）
+    base-url: "https://llm-api.net/v1/chat/completions"
+    # API Key（为空时不调用 LLM，直接使用预设建议）
+    api-key: "sk-r81yU0O4VqTLI0dq178017EXgNfLAQ3zG6ykdyn3yDuiEKEh"
+    # 模型名称
+    model: "deepseek-v4-flash"
+    # 温度参数（0~1，越高越有创造性）
+    temperature: 0.8
+    # 最大输出 token 数
+    max-tokens: 120
+
 # ===== OCR 照片识词配置 =====
 ocr:
   # 模型存储目录（相对于项目根目录）

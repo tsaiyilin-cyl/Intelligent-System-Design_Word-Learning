@@ -161,6 +161,37 @@
             margin-bottom: 20px;
         }
 
+        .tips-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .tips-header h3 {
+            margin-bottom: 0;
+        }
+
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: #5a6fd6;
+        }
+
+        .refresh-btn:disabled {
+            background: #a0a9cc;
+            cursor: not-allowed;
+        }
+
         .tip-item {
             padding: 15px;
             background: #f8f9fa;
@@ -292,26 +323,16 @@
         </div>
 
         <div class="tips-section">
-            <h3>💡 学习建议</h3>
-
-            <div class="tip-item">
-                <div class="tip-title">制定合理目标</div>
-                <div class="tip-content">根据您的学习阶段和类型，建议每天学习10-20个新单词，循序渐进。</div>
+            <div class="tips-header">
+                <h3>💡 学习建议</h3>
+                <button class="refresh-btn" id="refreshTipBtn" onclick="loadStudyTip()">
+                    🔄 重新获取建议
+                </button>
             </div>
 
-            <div class="tip-item">
-                <div class="tip-title">定期复习</div>
-                <div class="tip-content">利用艾宾浩斯遗忘曲线，在适当的时间间隔复习已学单词，提高记忆效果。</div>
-            </div>
-
-            <div class="tip-item">
-                <div class="tip-title">保持连续性</div>
-                <div class="tip-content">每天坚持学习，即使时间不长，也能形成良好的学习习惯，提升学习效果。</div>
-            </div>
-
-            <div class="tip-item">
-                <div class="tip-title">多样化学习</div>
-                <div class="tip-content">结合单词卡片、测试练习等多种方式，全方位巩固单词记忆。</div>
+            <div class="tip-item" id="tipItem">
+                <div class="tip-title" id="tipTitle">加载中...</div>
+                <div class="tip-content" id="tipContent">请稍候，正在获取今日学习建议</div>
             </div>
         </div>
     </div>
@@ -353,7 +374,58 @@
 
             // 从后端加载实时数据
             loadPlanData();
+            // 加载学习建议
+            loadStudyTip();
         });
+
+        // 预设建议（API 失败时回退使用）
+        const predefinedTips = [
+            { title: '制定合理目标', content: '根据您的学习阶段和类型，建议每天学习10-20个新单词，循序渐进。' },
+            { title: '定期复习', content: '利用艾宾浩斯遗忘曲线，在适当的时间间隔复习已学单词，提高记忆效果。' },
+            { title: '保持连续性', content: '每天坚持学习，即使时间不长，也能形成良好的学习习惯，提升学习效果。' },
+            { title: '多样化学习', content: '结合单词卡片、测试练习等多种方式，全方位巩固单词记忆。' }
+        ];
+
+        // 初始随机展示一条
+        (function initTip() {
+            const tip = predefinedTips[Math.floor(Math.random() * predefinedTips.length)];
+            document.getElementById('tipTitle').textContent = tip.title;
+            document.getElementById('tipContent').textContent = tip.content;
+        })();
+
+        let tipLoading = false;
+
+        async function loadStudyTip() {
+            if (tipLoading) return;
+            tipLoading = true;
+            const btn = document.getElementById('refreshTipBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 获取中...';
+
+            try {
+                const res = await fetch('/api/report/studyTip?userId=' + currentUser.userId);
+                const data = await res.json();
+                if (data.code === 200 && data.data) {
+                    document.getElementById('tipTitle').textContent = data.data.title;
+                    document.getElementById('tipContent').textContent = data.data.content;
+                } else {
+                    // API 返回异常，随机取预设
+                    const tip = predefinedTips[Math.floor(Math.random() * predefinedTips.length)];
+                    document.getElementById('tipTitle').textContent = tip.title;
+                    document.getElementById('tipContent').textContent = tip.content;
+                }
+            } catch (e) {
+                console.error('获取学习建议失败', e);
+                // 网络错误，随机取预设
+                const tip = predefinedTips[Math.floor(Math.random() * predefinedTips.length)];
+                document.getElementById('tipTitle').textContent = tip.title;
+                document.getElementById('tipContent').textContent = tip.content;
+            } finally {
+                tipLoading = false;
+                btn.disabled = false;
+                btn.textContent = '🔄 重新获取建议';
+            }
+        }
 
         async function loadPlanData() {
             try {

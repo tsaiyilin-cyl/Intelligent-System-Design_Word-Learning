@@ -51,6 +51,24 @@ public class ReportController {
         return result;
     }
 
+    /**
+     * 获取学习建议（一条）
+     * 优先调用大模型生成个性化建议，失败则随机返回预设建议
+     */
+    @GetMapping("/studyTip")
+    public Map<String, Object> getStudyTip(@RequestParam String userId) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            Map<String, Object> tip = reportService.getStudyTip(userId);
+            result.put("code", 200);
+            result.put("data", tip);
+        } catch (Exception e) {
+            result.put("code", 500);
+            result.put("message", e.getMessage());
+        }
+        return result;
+    }
+
     @GetMapping("/wordList")
     public Map<String, Object> getWordList(
             @RequestParam String userId,

@@ -3,10 +3,17 @@ package cn.edu.cuc.class10.service;
 import cn.edu.cuc.class10.dto.DashboardDataResponse;
 import cn.edu.cuc.class10.entity.*;
 import cn.edu.cuc.class10.repository.*;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -15,6 +22,8 @@ import java.util.Calendar;
 
 @Service
 public class ReportService {
+
+    private static final Logger log = LoggerFactory.getLogger(ReportService.class);
 
     @Autowired
     private UserRepository userRepository;
@@ -26,6 +35,34 @@ public class ReportService {
     private TestSessionRepository testSessionRepository;
     @Autowired
     private InteractionRepository interactionRepository;
+
+    @Autowired
+    private RestTemplate restTemplate;
+
+    @Value("${study-tip.llm.base-url:}")
+    private String llmBaseUrl;
+
+    @Value("${study-tip.llm.api-key:}")
+    private String llmApiKey;
+
+    @Value("${study-tip.llm.model:deepseek-chat}")
+    private String llmModel;
+
+    @Value("${study-tip.llm.temperature:0.8}")
+    private double llmTemperature;
+
+    @Value("${study-tip.llm.max-tokens:120}")
+    private int llmMaxTokens;
+
+    private static final List<Map<String, String>> PREDEFINED_TIPS = List.of(
+            Map.of("title", "制定合理目标", "content", "根据您的学习阶段和类型，建议每天学习10-20个新单词，循序渐进。"),
+            Map.of("title", "定期复习", "content", "利用艾宾浩斯遗忘曲线，在适当的时间间隔复习已学单词，提高记忆效果。"),
+            Map.of("title", "保持连续性", "content", "每天坚持学习，即使时间不长，也能形成良好的学习习惯，提升学习效果。"),
+            Map.of("title", "多样化学习", "content", "结合单词卡片、测试练习等多种方式，全方位巩固单词记忆。")
+    );
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Random random = new Random();
 
     public DashboardDataResponse getDashboardData(String userId) {
         User user = userRepository.findById(userId)
@@ -245,6 +282,128 @@ public class ReportService {
         result.put("studyStreak", studyStreak);
         result.put("todayLearned", (int) todayLearned);
         return result;
+    }
+
+    /**
+     * 获取学习建议（优先调用大模型，失败则使用预设建议）
+     */
+    public Map<String, Object> getStudyTip(String userId) {
+        // 1. 获取用户数据
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("用户不存在"));
+
+        // 2. 获取学习统计数据
+        Map<String, Object> planData = getStudyPlanData(userId);
+
+        // 3. 尝试调用大模型 API
+        if (llmApiKey != null && !llmApiKey.isBlank() && llmBaseUrl != null && !llmBaseUrl.isBlank()) {
+            try {
+                Map<String, String> llmTip = callLlmApi(user, planData);
+                Map<String, Object> result = new HashMap<>();
+                result.put("title", llmTip.get("title"));
+                result.put("content", llmTip.get("content"));
+                result.put("source", "ai");
+                return result;
+            } catch (Exception e) {
+                log.warn("大模型建议生成失败，使用预设建议: {}", e.getMessage());
+            }
+        }
+
+        // 4. 失败回退：随机选取一条预设建议
+        Map<String, String> fallback = getRandomPredefinedTip();
+        Map<String, Object> result = new HashMap<>();
+        result.put("title", fallback.get("title"));
+        result.put("content", fallback.get("content"));
+        result.put("source", "predefined");
+        return result;
+    }
+
+    /**
+     * 调用大模型 API 生成个性化学习建议
+     */
+    private Map<String, String> callLlmApi(User user, Map<String, Object> planData) throws Exception {
+        String phaseName = switch (user.getPhase()) {
+            case "primary" -> "小学";
+            case "junior" -> "初中";
+            case "senior" -> "高中";
+            case "non-student" -> "非学生（社会学习者）";
+            default -> user.getPhase();
+        };
+        String typeName = "memory".equals(user.getUserType()) ? "记忆型（偏好深度记忆）" : "刷题型（偏好快速刷词）";
+
+        // 构建 prompt
+        String prompt = String.format("""
+                你是一位英语学习规划师。请根据以下用户信息，给出一条简短的个性化学习建议。
+
+                用户信息：
+                - 学习阶段：%s
+                - 学习类型：%s
+                - 每日目标：%s 词/天
+                - 已学单词：%s 词
+                - 已掌握：%s 词
+                - 连续打卡：%s 天
+                - 今日已学：%s 词
+
+                参考格式（标题4字左右，内容一句话）：
+                {"title": "制定合理目标", "content": "根据您的学习阶段和类型，建议每天学习10-20个新单词，循序渐进。"}
+
+                要求：
+                1. 输出严格 JSON，包含 title 和 content 两个字段，不要 markdown 代码块
+                2. title 限制在 4~6 个字，简洁有力
+                3. content 一句话，控制在 30~50 字，具体可操作
+                4. 结合用户的学习阶段和类型，有针对性
+                5. 语气积极鼓励""",
+                phaseName, typeName,
+                planData.get("dailyGoal"), planData.get("totalWords"),
+                planData.get("masteredWords"), planData.get("studyStreak"),
+                planData.get("todayLearned"));
+
+        // 构建请求体
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", llmModel);
+        requestBody.put("temperature", llmTemperature);
+        requestBody.put("max_tokens", llmMaxTokens);
+
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", "你是一位英语学习规划助手。输出严格 JSON，格式如 {\"title\":\"标题\",\"content\":\"建议\"}。"));
+        messages.add(Map.of("role", "user", "content", prompt));
+        requestBody.put("messages", messages);
+
+        // 发送请求
+        String baseUrl = llmBaseUrl.replaceAll("/+$", "");
+        if (!baseUrl.endsWith("/chat/completions")) {
+            baseUrl += "/chat/completions";
+        }
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(llmApiKey);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+        ResponseEntity<String> response = restTemplate.exchange(baseUrl, HttpMethod.POST, entity, String.class);
+
+        // 解析响应
+        JsonNode root = objectMapper.readTree(response.getBody());
+        String content = root.path("choices").get(0).path("message").path("content").asText();
+
+        // 清理可能的 markdown 代码块
+        content = content.replaceAll("(?s)```\\w*\\s*", "").trim();
+
+        JsonNode tipJson = objectMapper.readTree(content);
+        String title = tipJson.path("title").asText();
+        String tipContent = tipJson.path("content").asText();
+
+        if (title.isBlank() || tipContent.isBlank()) {
+            throw new RuntimeException("LLM 返回内容不完整");
+        }
+
+        return Map.of("title", title, "content", tipContent);
+    }
+
+    /**
+     * 随机返回一条预设建议
+     */
+    private Map<String, String> getRandomPredefinedTip() {
+        return PREDEFINED_TIPS.get(random.nextInt(PREDEFINED_TIPS.size()));
     }
 
     private int calculateStreak(List<Interaction> interactions) {

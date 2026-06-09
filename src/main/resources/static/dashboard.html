@@ -1662,11 +1662,21 @@
 
                 <!-- 学习建议 -->
                 <el-card shadow="never" style="border-radius:14px;">
-                    <template #header><span style="font-weight:600;">💡 学习建议</span></template>
+                    <template #header>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-weight:600;">💡 学习建议</span>
+                            <el-button size="small" type="primary" plain :loading="tipLoading" @click="loadStudyTip" style="font-size:12px;">
+                                🔄 重新获取建议
+                            </el-button>
+                        </div>
+                    </template>
                     <div style="padding:4px 0;">
-                        <div v-for="(tip, ti) in studyTips" :key="ti" style="padding:14px 16px; background:#f8f9fc; border-left:4px solid #667eea; border-radius:8px; margin-bottom:12px;">
-                            <div style="font-weight:600; color:#333; margin-bottom:4px;">{{ tip.title }}</div>
-                            <div style="color:#666; font-size:14px;">{{ tip.content }}</div>
+                        <div v-if="currentTip" style="padding:16px 18px; background:linear-gradient(135deg, #f8f9fc 0%, #eef1f9 100%); border-left:4px solid #667eea; border-radius:8px;">
+                            <div style="font-weight:600; color:#333; margin-bottom:6px; font-size:15px;">{{ currentTip.title }}</div>
+                            <div style="color:#555; font-size:14px; line-height:1.7;">{{ currentTip.content }}</div>
+                        </div>
+                        <div v-else style="text-align:center; color:#999; padding:20px 0; font-size:14px;">
+                            点击上方按钮获取今日学习建议
                         </div>
                     </div>
                 </el-card>
@@ -3655,6 +3665,36 @@ const app = createApp({
             { title: '多样化学习', content: '结合单词卡片、测试练习等多种方式，全方位巩固单词记忆。' }
         ];
 
+        // 当前展示的学习建议（初始随机一条）
+        const currentTip = ref(studyTips[Math.floor(Math.random() * studyTips.length)]);
+        const tipLoading = ref(false);
+
+        async function loadStudyTip() {
+            if (!user.value) return;
+            tipLoading.value = true;
+            try {
+                const res = await axios.get('/api/report/studyTip', {
+                    params: { userId: user.value.userId },
+                    timeout: 15000
+                });
+                if (res.data.code === 200 && res.data.data) {
+                    currentTip.value = {
+                        title: res.data.data.title,
+                        content: res.data.data.content
+                    };
+                } else {
+                    // API 返回异常，随机取预设建议
+                    currentTip.value = studyTips[Math.floor(Math.random() * studyTips.length)];
+                }
+            } catch (e) {
+                console.error('获取学习建议失败', e);
+                // 网络错误，随机取预设建议
+                currentTip.value = studyTips[Math.floor(Math.random() * studyTips.length)];
+            } finally {
+                tipLoading.value = false;
+            }
+        }
+
         const profileInfoItems = computed(() => [
             { label: '用户名', value: user.value?.username || '-' },
             { label: '学习阶段', value: phaseMap[user.value?.phase] || user.value?.phase || '-' },
@@ -3892,7 +3932,8 @@ const app = createApp({
             addOcrWordToLibrary, addManualWord,
 
             // 学习计划
-            planData, loadStudyPlan, todayProgress, masteryRate, studyTips,
+            planData, loadStudyPlan, todayProgress, masteryRate,
+            currentTip, tipLoading, loadStudyTip,
 
             // 生词本
             mistakeWords, mistakeSearch, filteredMistakeWords,
