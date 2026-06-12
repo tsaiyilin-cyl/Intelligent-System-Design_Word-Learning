@@ -1,590 +1,192 @@
 package cn.edu.cuc.class10.service;
 
-import ai.djl.ModelException;
-import ai.djl.inference.Predictor;
-import ai.djl.modality.Classifications;
-import ai.djl.modality.cv.Image;
-import ai.djl.modality.cv.ImageFactory;
-import ai.djl.modality.cv.transform.Normalize;
-import ai.djl.modality.cv.transform.Resize;
-import ai.djl.modality.cv.transform.ToTensor;
-import ai.djl.modality.cv.translator.ImageClassificationTranslator;
-import ai.djl.repository.zoo.Criteria;
-import ai.djl.repository.zoo.ModelZoo;
-import ai.djl.repository.zoo.ZooModel;
-import ai.djl.translate.TranslateException;
 import cn.edu.cuc.class10.entity.Word;
 import cn.edu.cuc.class10.repository.WordRepository;
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
-import java.io.*;
-import java.net.URL;
-import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 照片识词核心服务
- * 使用 DJL 加载预训练 ResNet 模型进行图片分类
- * 识别结果与 words 表匹配，推荐对应英文单词
+ *
+ * 【架构变更说明】
+ * 原实现：使用 DJL 本地加载 PyTorch 模型进行推理（700+ 行复杂代码）
+ * 现实现：调用 Flask AI 服务进行推理，数据库单词匹配仍保留在本地
+ *
+ * Flask 负责：
+ *   - 模型加载 / 管理 / 自动下载
+ *   - 图片预处理 + TorchScript 推理
+ *   - 依赖检查与自动安装（跨机器部署）
+ *
+ * Spring Boot 负责：
+ *   - 图片上传接收
+ *   - 调用 Flask 获取分类结果
+ *   - 数据库单词精确匹配
+ *   - 响应格式化
  */
 @Service
 public class OcrService {
 
     private static final Logger log = LoggerFactory.getLogger(OcrService.class);
 
-    @Value("${ocr.model-directory:ocr-models}")
-    private String modelDirectory;
+    @Value("${flask.base-url:http://localhost:5000}")
+    private String flaskBaseUrl;
 
-    @Value("${ocr.labels-file:synset_21k.txt}")
-    private String labelsFile;
+    @Value("${flask.connect-timeout:5000}")
+    private int flaskConnectTimeout;
 
-    @Value("${ocr.top-k:3}")
+    @Value("${flask.read-timeout:10000}")
+    private int flaskReadTimeout;
+
+    @Value("${ocr.top-k:5}")
     private int topK;
 
     @Value("${ocr.confidence-threshold:0.3}")
     private float confidenceThreshold;
 
-    @Value("${ocr.model-name:ResNet-50}")
-    private String modelName;
-
-    @Value("${ocr.model-url:}")
-    private String modelUrl;
-
     @Autowired
     private WordRepository wordRepository;
 
-    private ZooModel<Image, Classifications> model;
-    private Predictor<Image, Classifications> predictor;
+    private final RestTemplate restTemplate = new RestTemplate();
 
-    /** 从 synset_21k.txt 加载的有效标签集合（小写） */
-    private final Set<String> validLabels = new HashSet<>();
-
-    /** 按模型输出顺序的标签列表（用于 Translator 的 synset 映射） */
-    private List<String> synsetLabels = new ArrayList<>();
-
-    private volatile boolean modelReady = false;
-    private String modelError;
+    // ==================== Flask 远程调用 ====================
 
     /**
-     * 应用启动时初始化：加载标签文件 → 加载模型
-     */
-    @PostConstruct
-    public void init() {
-        try {
-            // 1. 确保模型目录存在
-            File modelDir = new File(modelDirectory);
-            if (!modelDir.exists()) {
-                modelDir.mkdirs();
-                log.info("Created model directory: {}", modelDir.getAbsolutePath());
-            }
-
-            // 2. 加载 synset 标签
-            loadSynsetLabels();
-            loadSynsetList();  // 加载有序列表供 translator 使用
-
-            // 3. 加载预训练分类模型
-            log.info("Loading OCR model: {}...", modelName);
-            loadClassificationModel();
-
-            modelReady = true;
-            log.info("OCR model loaded successfully: {}", modelName);
-        } catch (Exception e) {
-            modelError = "模型加载失败: " + e.getMessage();
-            log.error("Failed to load OCR model", e);
-        }
-    }
-
-    // ==================== 模型加载（多策略） ====================
-
-    /** DJL 模型仓库中 ResNet-50 的下载 URL（备用，当 model zoo 不可用时） */
-    private static final String MODEL_REPO_URL =
-            "https://mlrepo.djl.ai/model/cv/image_classification/ai/djl/zoo/resnet/0.0.5/resnet-50.zip";
-
-    private void loadSynsetLabels() throws IOException {
-        String resourcePath = labelsFile;
-        InputStream is = null;
-
-        // 先从 classpath 加载
-        is = getClass().getClassLoader().getResourceAsStream(resourcePath);
-
-        // 再从外部文件加载
-        if (is == null) {
-            File externalFile = new File(modelDirectory, resourcePath);
-            if (externalFile.exists()) {
-                is = new FileInputStream(externalFile);
-            }
-        }
-
-        if (is == null) {
-            log.warn("Synset file not found: {}, labels will be empty", resourcePath);
-            return;
-        }
-
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-                if (line.isEmpty() || line.startsWith("#")) continue;
-                String label = line;
-                if (label.matches("^n\\d+\\s+.*")) {
-                    label = label.replaceAll("^n\\d+\\s+", "");
-                }
-                label = cleanLabel(label);
-                if (!label.isEmpty()) {
-                    validLabels.add(label.toLowerCase());
-                }
-            }
-        }
-        log.info("Loaded {} valid labels from synset file", validLabels.size());
-    }
-
-    /**
-     * 加载有序的 synset 标签列表（用于 ImageClassificationTranslator 的类别映射）
-     * 加载方式与 loadSynsetLabels() 相同，但保持列表顺序
-     */
-    private void loadSynsetList() throws IOException {
-        List<String> labels = new ArrayList<>();
-        InputStream is = null;
-
-        // 先从 classpath 加载
-        is = getClass().getClassLoader().getResourceAsStream(labelsFile);
-
-        // 再从外部文件加载
-        if (is == null) {
-            File externalFile = new File(modelDirectory, labelsFile);
-            if (externalFile.exists()) {
-                is = new FileInputStream(externalFile);
-            }
-        }
-
-        if (is == null) {
-            log.warn("Synset file not found: {}, ordered list will be empty", labelsFile);
-            synsetLabels = labels;
-            return;
-        }
-
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-                if (line.isEmpty() || line.startsWith("#")) continue;
-                // 直接添加（保留原始名称，不去除下划线——给 translator 使用）
-                labels.add(line);
-            }
-        }
-        synsetLabels = Collections.unmodifiableList(labels);
-        log.info("Loaded {} ordered labels for synset", synsetLabels.size());
-    }
-
-    /**
-     * 策略 0: 从本地 TorchScript .pt 文件加载模型 (最高优先级)
+     * 调用 Flask AI 服务进行图片识别
      *
-     * 如果本地文件不存在，尝试从 model-url 自动下载。
-     * 下载完成后缓存到本地，后续启动直接加载。
-     * 如果下载也失败，则 fallback 到 DJL Zoo 的 1000 类模型。
+     * @param imageBytes 图片原始字节
+     * @return Flask 返回的原始 JSON（含 label / confidence / classIndex）
      */
-    private boolean tryLoadTorchScript(String ptPath) {
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> callFlaskOcr(byte[] imageBytes) {
+        String url = flaskBaseUrl.replaceAll("/+$", "") + "/api/ocr/recognize";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        HttpEntity<byte[]> entity = new HttpEntity<>(imageBytes, headers);
+
+        // 为 OCR 请求单独设置超时（大图片可能需要更多时间）
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(flaskConnectTimeout);
+        factory.setReadTimeout(flaskReadTimeout * 3); // OCR 推理较慢，超时放宽到 3 倍
+        RestTemplate ocrRestTemplate = new RestTemplate(factory);
+
+        ResponseEntity<Map> response = ocrRestTemplate.exchange(
+                url, HttpMethod.POST, entity, Map.class);
+
+        Map<String, Object> body = response.getBody();
+        if (body == null || !Integer.valueOf(200).equals(body.get("code"))) {
+            String msg = body != null ? (String) body.get("message") : "null response";
+            throw new RuntimeException("Flask OCR 返回异常: " + msg);
+        }
+
+        return body;
+    }
+
+    /**
+     * 查询 Flask OCR 模型状态
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> fetchFlaskOcrStatus() {
+        String url = flaskBaseUrl.replaceAll("/+$", "") + "/api/ocr/status";
         try {
-            Path path = Paths.get(ptPath);
-            Path parentDir = path.getParent();
-            if (parentDir != null) {
-                Files.createDirectories(parentDir);
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    url, HttpMethod.GET, null, Map.class);
+            Map<String, Object> body = response.getBody();
+            if (body != null && Integer.valueOf(200).equals(body.get("code"))) {
+                return (Map<String, Object>) body.get("data");
             }
-
-            // === 文件不存在时自动下载 ===
-            if (!Files.exists(path)) {
-                log.warn("TorchScript model not found: {}", path.toAbsolutePath());
-                if (modelUrl != null && !modelUrl.isBlank()) {
-                    log.info("Downloading from: {}", modelUrl);
-                    boolean downloaded = downloadModel(path);
-                    if (!downloaded) {
-                        log.warn("Download failed, will try fallback strategies");
-                        return false;
-                    }
-                } else {
-                    log.info("No model-url configured, add 'ocr.model-url' to application.yaml to enable auto-download");
-                    log.info("Will try fallback strategies (DJL Zoo models)");
-                    return false;
-                }
-            }
-
-            // === 加载模型 ===
-            log.info("Loading TorchScript model: {} ({} classes, topK={})",
-                    ptPath, synsetLabels.size(), topK);
-
-            float[] mean = {0.485f, 0.456f, 0.406f};
-            float[] std  = {0.229f, 0.224f, 0.225f};
-
-            var translator = ImageClassificationTranslator.builder()
-                    .addTransform(new Resize(224, 224))
-                    .addTransform(new ToTensor())
-                    .addTransform(new Normalize(mean, std))
-                    .optSynset(synsetLabels)
-                    .optTopK(topK)
-                    .build();
-
-            Criteria<Image, Classifications> criteria = Criteria.builder()
-                    .setTypes(Image.class, Classifications.class)
-                    .optModelPath(path)
-                    .optEngine("PyTorch")
-                    .optTranslator(translator)
-                    .optOption("mapLocation", "true")
-                    .build();
-
-            model = ModelZoo.loadModel(criteria);
-            predictor = model.newPredictor();
-            log.info("OK Model loaded from TorchScript: {} ({} classes)", ptPath, synsetLabels.size());
-            return true;
-
         } catch (Exception e) {
-            log.warn("TorchScript load failed: {} (will try next strategy)", e.getMessage());
-            return false;
+            log.warn("Flask OCR 状态查询失败: {}", e.getMessage());
         }
+        return null;
     }
 
-    /**
-     * 从 model-url 下载模型文件到本地路径
-     * 显示下载进度，支持断点续传（未完整下载时重试）
-     */
-    private boolean downloadModel(Path targetPath) {
-        try {
-            log.info("Downloading OCR model ({} MB) ...", "~392");
-            log.info("  URL: {}", modelUrl);
-
-            URL url = new URL(modelUrl);
-            Path tempPath = targetPath.resolveSibling(targetPath.getFileName() + ".download");
-
-            // 清理上次残留的临时文件
-            Files.deleteIfExists(tempPath);
-
-            // 下载
-            try (InputStream in = url.openStream();
-                 FileOutputStream out = new FileOutputStream(tempPath.toFile())) {
-
-                byte[] buffer = new byte[8192];
-                long totalRead = 0;
-                int bytesRead;
-                long lastLog = 0;
-
-                while ((bytesRead = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, bytesRead);
-                    totalRead += bytesRead;
-
-                    // 每 10 秒或每 50MB 打一次日志
-                    if (totalRead - lastLog > 50 * 1024 * 1024 || lastLog == 0) {
-                        log.info("  Downloaded: {} MB", totalRead / (1024 * 1024));
-                        lastLog = totalRead;
-                    }
-                }
-            }
-
-            // 下载完成，重命名为正式文件名
-            Files.move(tempPath, targetPath, StandardCopyOption.ATOMIC_MOVE);
-            log.info("Download complete: {} ({} MB)",
-                    targetPath.getFileName(), Files.size(targetPath) / (1024 * 1024));
-            return true;
-
-        } catch (Exception e) {
-            log.error("Model download failed: {}", e.getMessage());
-            // 清理临时文件
-            try {
-                Path tempPath = targetPath.resolveSibling(targetPath.getFileName() + ".download");
-                Files.deleteIfExists(tempPath);
-            } catch (IOException ignored) {}
-            return false;
-        }
-    }
-
-    /**
-     * 多策略模型加载：
-     * 0) 本地 TorchScript .pt 文件 (ImageNet-21k, 最高优先级)
-     * 1) PyTorch + Zoo (group=ai.djl.zoo, artifact=resnet, layers=50)
-     * 2) PyTorch + optModelUrls (从 DJL 仓库下载 ZIP)
-     * 3) 本地缓存文件加载
-     * 4) 自动检测
-     */
-    private void loadClassificationModel() throws Exception {
-        // 策略 0: 加载本地 TorchScript .pt 文件 (ImageNet-21k)
-        String ptPath = modelDirectory + "/" + modelName + ".pt";
-        if (tryLoadTorchScript(ptPath)) return;
-
-        // 策略 1: 使用 PyTorch 引擎 + 显式 groupId/artifactId
-        if (tryLoadFromZoo("PyTorch", "ai.djl.zoo", "resnet")) return;
-
-        // 策略 2: 从 DJL 模型仓库 URL 下载并加载
-        if (tryLoadFromRepoUrl()) return;
-
-        // 策略 3: 从本地缓存目录加载
-        if (tryLoadFromLocalCache()) return;
-
-        // 策略 4: 尝试自动检测引擎
-        if (tryLoadAutoDetect()) return;
-
-        throw new ModelException("所有模型加载策略均失败，请检查网络连接或手动下载模型文件到 " + modelDirectory);
-    }
-
-    /**
-     * 策略 1: 从 model zoo 加载
-     * 使用 groupId + artifactId + filter 精确定位 ResNet 模型
-     */
-    private boolean tryLoadFromZoo(String engine, String groupId, String artifactId) {
-        try {
-            log.info("Trying: zoo [engine={}, group={}, artifact={}, layers=50]", engine, groupId, artifactId);
-            Criteria<Image, Classifications> criteria = Criteria.builder()
-                    .optGroupId(groupId)
-                    .optArtifactId(artifactId)
-                    .setTypes(Image.class, Classifications.class)
-                    .optFilter("layers", "50")
-                    .optEngine(engine)
-                    .build();
-            model = ModelZoo.loadModel(criteria);
-            predictor = model.newPredictor();
-            log.info("✓ Model loaded from zoo: {}/{} via {}", groupId, artifactId, engine);
-            return true;
-        } catch (Exception e) {
-            log.warn("  ✗ Zoo load failed: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * 策略 2: 从 DJL 模型仓库下载 ZIP 并加载
-     */
-    private boolean tryLoadFromRepoUrl() {
-        try {
-            String cacheDir = modelDirectory + "/resnet-50-cached";
-            File cachePath = new File(cacheDir);
-
-            // 如果缓存不存在，下载并解压
-            if (!cachePath.exists() || !new File(cachePath, "resnet-50.param").exists()) {
-                log.info("Downloading ResNet-50 from DJL repo: {}", MODEL_REPO_URL);
-                cachePath.mkdirs();
-                downloadAndExtractZip(MODEL_REPO_URL, cachePath);
-            }
-
-            log.info("Trying: load from local cache at {}", cachePath);
-            Criteria<Image, Classifications> criteria = Criteria.builder()
-                    .setTypes(Image.class, Classifications.class)
-                    .optModelPath(cachePath.toPath())
-                    .build();
-            model = ModelZoo.loadModel(criteria);
-            predictor = model.newPredictor();
-            log.info("✓ Model loaded from cached repo download");
-            return true;
-        } catch (Exception e) {
-            log.warn("  ✗ Repo URL load failed: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * 策略 3: 从本地缓存目录加载
-     */
-    private boolean tryLoadFromLocalCache() {
-        // 检查常见的缓存路径
-        String[] cachePaths = {
-                modelDirectory + "/resnet-50",
-                modelDirectory + "/resnet50",
-                modelDirectory
-        };
-        for (String path : cachePaths) {
-            try {
-                File dir = new File(path);
-                if (dir.exists() && dir.isDirectory()) {
-                    log.info("Trying: load from local path {}", path);
-                    Criteria<Image, Classifications> criteria = Criteria.builder()
-                            .setTypes(Image.class, Classifications.class)
-                            .optModelPath(dir.toPath())
-                            .build();
-                    model = ModelZoo.loadModel(criteria);
-                    predictor = model.newPredictor();
-                    log.info("✓ Model loaded from local path: {}", path);
-                    return true;
-                }
-            } catch (Exception e) {
-                log.warn("  ✗ Local path {} failed: {}", path, e.getMessage());
-            }
-        }
-        return false;
-    }
-
-    /**
-     * 策略 4: 自动检测
-     */
-    private boolean tryLoadAutoDetect() {
-        try {
-            log.info("Trying: auto-detect engine from zoo");
-            Criteria<Image, Classifications> criteria = Criteria.builder()
-                    .optGroupId("ai.djl.zoo")
-                    .optArtifactId("resnet")
-                    .setTypes(Image.class, Classifications.class)
-                    .optFilter("layers", "50")
-                    .build();
-            model = ModelZoo.loadModel(criteria);
-            predictor = model.newPredictor();
-            log.info("✓ Model loaded with auto-detected engine");
-            return true;
-        } catch (Exception e) {
-            log.warn("  ✗ Auto-detect failed: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * 下载并解压 ZIP 文件（DJL 模型仓库格式）
-     */
-    private void downloadAndExtractZip(String url, File targetDir) throws IOException {
-        Path zipPath = targetDir.toPath().resolve("model.zip");
-        // 下载
-        log.info("Downloading {} ...", url);
-        try (ReadableByteChannel in = Channels.newChannel(new URL(url).openStream());
-             FileOutputStream out = new FileOutputStream(zipPath.toFile())) {
-            out.getChannel().transferFrom(in, 0, Long.MAX_VALUE);
-        }
-        // 解压
-        log.info("Extracting to {} ...", targetDir);
-        try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(
-                new FileInputStream(zipPath.toFile()))) {
-            java.util.zip.ZipEntry entry;
-            byte[] buffer = new byte[8192];
-            while ((entry = zis.getNextEntry()) != null) {
-                Path entryPath = targetDir.toPath().resolve(entry.getName());
-                if (entry.isDirectory()) {
-                    entryPath.toFile().mkdirs();
-                } else {
-                    entryPath.toFile().getParentFile().mkdirs();
-                    try (FileOutputStream fos = new FileOutputStream(entryPath.toFile())) {
-                        int len;
-                        while ((len = zis.read(buffer)) > 0) {
-                            fos.write(buffer, 0, len);
-                        }
-                    }
-                }
-                zis.closeEntry();
-            }
-        }
-        Files.deleteIfExists(zipPath);
-        log.info("Download and extraction complete");
-    }
-
-    // ==================== 核心推理方法 ====================
+    // ==================== 核心推理入口 ====================
 
     /**
      * 识别图片中的物体
+     *
      * @param imageStream 图片输入流
-     * @return 识别结果列表（按置信度降序）
-     * @throws IllegalStateException 模型未就绪时抛出
+     * @return 识别结果列表（按置信度降序），已匹配数据库单词
+     * @throws RuntimeException Flask 不可用或推理失败时抛出
      */
     public List<RecognitionResult> recognize(InputStream imageStream) {
-        if (!modelReady) {
-            String msg = modelError != null ? modelError : "模型正在加载中，请稍后再试";
-            throw new IllegalStateException(msg);
-        }
-
         try {
-            // 1. 读取图片
-            Image img = ImageFactory.getInstance().fromInputStream(imageStream);
+            // 1. 读取图片字节
+            byte[] imageBytes = readBytes(imageStream);
 
-            // 2. 模型推理
-            Classifications classifications = predictor.predict(img);
-
-            // 3. 获取 top-K 结果
-            List<Classifications.Classification> topKList = classifications.topK(topK);
-
-            // 4. Softmax 归一化：模型可能输出原始 logits，需转为 0~1 概率
-            //    检查第一个值，如果 >1 说明是 logits，需要 softmax
-            boolean isRawLogits = !topKList.isEmpty() &&
-                    (topKList.get(0).getProbability() > 1.0f ||
-                     topKList.get(0).getProbability() < 0);
-
-            if (isRawLogits) {
-                // 数值稳定的 softmax：减去最大值防止指数溢出
-                double maxLogit = Double.NEGATIVE_INFINITY;
-                for (Classifications.Classification c : topKList) {
-                    if (c.getProbability() > maxLogit) {
-                        maxLogit = c.getProbability();
-                    }
-                }
-                double sumExp = 0;
-                double[] expValues = new double[topKList.size()];
-                for (int i = 0; i < topKList.size(); i++) {
-                    expValues[i] = Math.exp(topKList.get(i).getProbability() - maxLogit);
-                    sumExp += expValues[i];
-                }
-                // 将 topK 结果替换为归一化后的概率
-                List<RecognitionResult> results = buildResults(topKList, expValues, sumExp);
-                results.sort((a, b) -> Float.compare(b.getConfidence(), a.getConfidence()));
-                return results;
-            } else {
-                // 已经是概率，直接使用
-                List<RecognitionResult> results = buildResults(topKList, null, 1.0);
-                results.sort((a, b) -> Float.compare(b.getConfidence(), a.getConfidence()));
-                return results;
+            // 2. 调用 Flask 获取分类候选
+            Map<String, Object> flaskResponse = callFlaskOcr(imageBytes);
+            List<Map<String, Object>> rawResults = (List<Map<String, Object>>) flaskResponse.get("data");
+            if (rawResults == null) {
+                return Collections.emptyList();
             }
 
-        } catch (TranslateException e) {
-            log.error("Image recognition inference failed", e);
-            throw new RuntimeException("图片识别推理失败: " + e.getMessage(), e);
+            // 3. 匹配数据库单词
+            List<RecognitionResult> results = new ArrayList<>();
+            for (Map<String, Object> raw : rawResults) {
+                String label = (String) raw.get("label");
+                Object confObj = raw.get("confidence");
+                float confidence = confObj instanceof Number ? ((Number) confObj).floatValue() : 0f;
+
+                if (confidence < confidenceThreshold) continue;
+
+                String displayName = formatDisplayName(label);
+
+                RecognitionResult result = new RecognitionResult();
+                result.setLabel(label);
+                result.setConfidence(confidence);
+                result.setDisplayName(displayName);
+
+                searchWordInDatabase(result, displayName);
+
+                results.add(result);
+            }
+
+            // 4. 按置信度降序排列
+            results.sort((a, b) -> Float.compare(b.getConfidence(), a.getConfidence()));
+            return results;
+
         } catch (IOException e) {
-            log.error("Failed to read image", e);
+            log.error("图片读取失败", e);
             throw new RuntimeException("图片读取失败: " + e.getMessage(), e);
+        } catch (RuntimeException e) {
+            log.error("图片识别失败", e);
+            throw e;  // 直接透传
+        } catch (Exception e) {
+            log.error("图片识别异常", e);
+            throw new RuntimeException("图片识别失败: " + e.getMessage(), e);
         }
     }
 
     /**
-     * 从 topK 分类结果构建 RecognitionResult 列表
-     * @param topKList 模型输出的 topK 分类
-     * @param expValues softmax 指数值（若为 null 则直接用原始概率）
-     * @param sumExp   指数和（若 expValues 为 null 则传 1.0）
+     * 将 InputStream 读取为字节数组
      */
-    private List<RecognitionResult> buildResults(
-            List<Classifications.Classification> topKList,
-            double[] expValues, double sumExp) {
-
-        List<RecognitionResult> results = new ArrayList<>();
-        for (int i = 0; i < topKList.size(); i++) {
-            Classifications.Classification c = topKList.get(i);
-
-            // 计算归一化后的置信度
-            float confidence;
-            if (expValues != null) {
-                confidence = (float) (expValues[i] / sumExp);
-            } else {
-                confidence = (float) c.getProbability();
-            }
-
-            if (confidence < confidenceThreshold) continue;
-
-            String rawClassName = c.getClassName();
-            String cleanedLabel = cleanLabel(rawClassName);
-            String displayName = formatDisplayName(cleanedLabel);
-
-            RecognitionResult result = new RecognitionResult();
-            result.setLabel(rawClassName);
-            result.setConfidence(confidence);
-            result.setDisplayName(displayName);
-
-            searchWordInDatabase(result, displayName);
-
-            results.add(result);
+    private byte[] readBytes(InputStream in) throws IOException {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        byte[] tmp = new byte[8192];
+        int n;
+        while ((n = in.read(tmp)) != -1) {
+            buffer.write(tmp, 0, n);
         }
-        return results;
+        return buffer.toByteArray();
     }
 
     // ==================== 标签处理 ====================
 
     /**
-     * 清洗 DJL 返回的类名，去除 synset ID 等前缀
+     * 清洗 DJL/Flask 返回的类名，去除 synset ID 等前缀
      */
     private String cleanLabel(String className) {
         if (className == null) return "";
@@ -616,7 +218,7 @@ public class OcrService {
 
     /**
      * 在 words 表中搜索与识别标签匹配的单词
-     * 匹配策略：仅精确匹配。若有任何不同，标记为未匹配，交由前端联网查询。
+     * 匹配策略：精确匹配（case-insensitive）
      */
     private void searchWordInDatabase(RecognitionResult result, String displayName) {
         if (displayName == null || displayName.isEmpty()) {
@@ -624,7 +226,6 @@ public class OcrService {
             return;
         }
 
-        // 仅精确匹配（case-insensitive），若有任何不同则交由前端联网查询
         Optional<Word> exactMatch = wordRepository.findByContent(displayName);
         if (exactMatch.isPresent()) {
             fillMatchedWord(result, exactMatch.get());
@@ -642,31 +243,36 @@ public class OcrService {
         result.setPartOfSpeech(word.getPartOfSpeech());
     }
 
-    // ==================== 资源清理 ====================
-
-    @PreDestroy
-    public void cleanup() {
-        if (predictor != null) {
-            predictor.close();
-        }
-        if (model != null) {
-            model.close();
-        }
-        log.info("OCR model resources released");
-    }
-
     // ==================== 状态查询 ====================
 
+    /**
+     * 检查 Flask OCR 模型是否就绪
+     */
     public boolean isModelReady() {
-        return modelReady;
+        Map<String, Object> status = fetchFlaskOcrStatus();
+        return status != null && Boolean.TRUE.equals(status.get("modelReady"));
     }
 
+    /**
+     * 获取 Flask OCR 模型的错误信息
+     */
     public String getModelError() {
-        return modelError;
+        Map<String, Object> status = fetchFlaskOcrStatus();
+        if (status == null) {
+            return "无法连接到 Flask AI 服务";
+        }
+        Object err = status.get("modelError");
+        return err instanceof String ? (String) err : "";
     }
 
+    /**
+     * 获取有效的标签数量
+     */
     public int getValidLabelCount() {
-        return validLabels.size();
+        Map<String, Object> status = fetchFlaskOcrStatus();
+        if (status == null) return 0;
+        Object count = status.get("labelCount");
+        return count instanceof Number ? ((Number) count).intValue() : 0;
     }
 
     // ==================== 内部类 - 识别结果 ====================
@@ -675,7 +281,7 @@ public class OcrService {
      * 单条识别结果，包含模型输出和数据库匹配信息
      */
     public static class RecognitionResult {
-        /** 模型原始输出标签名（如 "n01644373 tree frog"） */
+        /** 模型原始输出标签名（如 "tree frog"） */
         private String label;
         /** 置信度（0~1） */
         private float confidence;

@@ -3,8 +3,6 @@ package cn.edu.cuc.class10.service;
 import cn.edu.cuc.class10.dto.DashboardDataResponse;
 import cn.edu.cuc.class10.entity.*;
 import cn.edu.cuc.class10.repository.*;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.*;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -39,20 +38,14 @@ public class ReportService {
     @Autowired
     private RestTemplate restTemplate;
 
-    @Value("${study-tip.llm.base-url:}")
-    private String llmBaseUrl;
+    @Value("${flask.base-url:http://localhost:5000}")
+    private String flaskBaseUrl;
 
-    @Value("${study-tip.llm.api-key:}")
-    private String llmApiKey;
+    @Value("${flask.connect-timeout:5000}")
+    private int flaskConnectTimeout;
 
-    @Value("${study-tip.llm.model:deepseek-chat}")
-    private String llmModel;
-
-    @Value("${study-tip.llm.temperature:0.8}")
-    private double llmTemperature;
-
-    @Value("${study-tip.llm.max-tokens:120}")
-    private int llmMaxTokens;
+    @Value("${flask.read-timeout:10000}")
+    private int flaskReadTimeout;
 
     private static final List<Map<String, String>> PREDEFINED_TIPS = List.of(
             Map.of("title", "制定合理目标", "content", "根据您的学习阶段和类型，建议每天学习10-20个新单词，循序渐进。"),
@@ -61,7 +54,6 @@ public class ReportService {
             Map.of("title", "多样化学习", "content", "结合单词卡片、测试练习等多种方式，全方位巩固单词记忆。")
     );
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
     private final Random random = new Random();
 
     public DashboardDataResponse getDashboardData(String userId) {
@@ -285,28 +277,21 @@ public class ReportService {
     }
 
     /**
-     * 获取学习建议（优先调用大模型，失败则使用预设建议）
+     * 获取学习建议（优先调用 Flask AI 服务，失败则使用预设建议）
      */
     public Map<String, Object> getStudyTip(String userId) {
-        // 1. 获取用户数据
-        User user = userRepository.findById(userId)
+        // 1. 获取用户数据（仅用于校验用户存在）
+        userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("用户不存在"));
 
         // 2. 获取学习统计数据
         Map<String, Object> planData = getStudyPlanData(userId);
 
-        // 3. 尝试调用大模型 API
-        if (llmApiKey != null && !llmApiKey.isBlank() && llmBaseUrl != null && !llmBaseUrl.isBlank()) {
-            try {
-                Map<String, String> llmTip = callLlmApi(user, planData);
-                Map<String, Object> result = new HashMap<>();
-                result.put("title", llmTip.get("title"));
-                result.put("content", llmTip.get("content"));
-                result.put("source", "ai");
-                return result;
-            } catch (Exception e) {
-                log.warn("大模型建议生成失败，使用预设建议: {}", e.getMessage());
-            }
+        // 3. 尝试调用 Flask AI 服务
+        try {
+            return callFlaskForTip(userId, planData);
+        } catch (Exception e) {
+            log.warn("Flask AI 服务不可用，使用预设建议: {}", e.getMessage());
         }
 
         // 4. 失败回退：随机选取一条预设建议
@@ -319,84 +304,43 @@ public class ReportService {
     }
 
     /**
-     * 调用大模型 API 生成个性化学习建议
+     * 调用 Flask AI 服务生成个性化学习建议
      */
-    private Map<String, String> callLlmApi(User user, Map<String, Object> planData) throws Exception {
-        String phaseName = switch (user.getPhase()) {
-            case "primary" -> "小学";
-            case "junior" -> "初中";
-            case "senior" -> "高中";
-            case "non-student" -> "非学生（社会学习者）";
-            default -> user.getPhase();
-        };
-        String typeName = "memory".equals(user.getUserType()) ? "记忆型（偏好深度记忆）" : "刷题型（偏好快速刷词）";
+    private Map<String, Object> callFlaskForTip(String userId, Map<String, Object> planData) throws Exception {
+        String url = flaskBaseUrl.replaceAll("/+$", "") + "/api/study-tip";
 
-        // 构建 prompt
-        String prompt = String.format("""
-                你是一位英语学习规划师。请根据以下用户信息，给出一条简短的个性化学习建议。
-
-                用户信息：
-                - 学习阶段：%s
-                - 学习类型：%s
-                - 每日目标：%s 词/天
-                - 已学单词：%s 词
-                - 已掌握：%s 词
-                - 连续打卡：%s 天
-                - 今日已学：%s 词
-
-                参考格式（标题4字左右，内容一句话）：
-                {"title": "制定合理目标", "content": "根据您的学习阶段和类型，建议每天学习10-20个新单词，循序渐进。"}
-
-                要求：
-                1. 输出严格 JSON，包含 title 和 content 两个字段，不要 markdown 代码块
-                2. title 限制在 4~6 个字，简洁有力
-                3. content 一句话，控制在 30~50 字，具体可操作
-                4. 结合用户的学习阶段和类型，有针对性
-                5. 语气积极鼓励""",
-                phaseName, typeName,
-                planData.get("dailyGoal"), planData.get("totalWords"),
-                planData.get("masteredWords"), planData.get("studyStreak"),
-                planData.get("todayLearned"));
-
-        // 构建请求体
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", llmModel);
-        requestBody.put("temperature", llmTemperature);
-        requestBody.put("max_tokens", llmMaxTokens);
+        requestBody.put("userId", userId);
+        requestBody.put("studyData", planData);
 
-        List<Map<String, String>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", "你是一位英语学习规划助手。输出严格 JSON，格式如 {\"title\":\"标题\",\"content\":\"建议\"}。"));
-        messages.add(Map.of("role", "user", "content", prompt));
-        requestBody.put("messages", messages);
-
-        // 发送请求
-        String baseUrl = llmBaseUrl.replaceAll("/+$", "");
-        if (!baseUrl.endsWith("/chat/completions")) {
-            baseUrl += "/chat/completions";
-        }
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(llmApiKey);
-
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-        ResponseEntity<String> response = restTemplate.exchange(baseUrl, HttpMethod.POST, entity, String.class);
 
-        // 解析响应
-        JsonNode root = objectMapper.readTree(response.getBody());
-        String content = root.path("choices").get(0).path("message").path("content").asText();
+        // 设置超时
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(flaskConnectTimeout);
+        requestFactory.setReadTimeout(flaskReadTimeout);
+        RestTemplate flaskRestTemplate = new RestTemplate(requestFactory);
 
-        // 清理可能的 markdown 代码块
-        content = content.replaceAll("(?s)```\\w*\\s*", "").trim();
-
-        JsonNode tipJson = objectMapper.readTree(content);
-        String title = tipJson.path("title").asText();
-        String tipContent = tipJson.path("content").asText();
-
-        if (title.isBlank() || tipContent.isBlank()) {
-            throw new RuntimeException("LLM 返回内容不完整");
+        ResponseEntity<Map> response = flaskRestTemplate.exchange(
+                url, HttpMethod.POST, entity, Map.class);
+        Map<String, Object> body = response.getBody();
+        if (body == null || !Integer.valueOf(200).equals(body.get("code"))) {
+            throw new RuntimeException("Flask 返回异常: " + (body != null ? body.get("message") : "null"));
         }
 
-        return Map.of("title", title, "content", tipContent);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) body.get("data");
+        if (data == null || data.get("title") == null || data.get("content") == null) {
+            throw new RuntimeException("Flask 返回数据不完整");
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("title", data.get("title"));
+        result.put("content", data.get("content"));
+        result.put("source", data.getOrDefault("source", "ai"));
+        return result;
     }
 
     /**

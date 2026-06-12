@@ -359,6 +359,8 @@
     <script>
         let currentUser = null;
         let currentWordListFilter = 'all';
+        let cachedTip = null;              // 预缓存的学习建议
+        let currentDisplayedTip = null;    // 当前显示的建议（用于相邻去重）
 
         // 页面加载时获取用户信息
         window.addEventListener('load', function() {
@@ -374,8 +376,13 @@
 
             // 从后端加载实时数据
             loadPlanData();
-            // 加载学习建议
-            loadStudyTip();
+            // 预加载学习建议（缓存结果，避免点击"重新获取"时等待）
+            preloadTip();
+        });
+
+        // 切出页面时丢弃缓存（用户可能做了操作使数据变更）
+        window.addEventListener('beforeunload', function() {
+            cachedTip = null;
         });
 
         // 预设建议（API 失败时回退使用）
@@ -386,45 +393,71 @@
             { title: '多样化学习', content: '结合单词卡片、测试练习等多种方式，全方位巩固单词记忆。' }
         ];
 
-        // 初始随机展示一条
-        (function initTip() {
-            const tip = predefinedTips[Math.floor(Math.random() * predefinedTips.length)];
+        // ========== 学习建议（预置秒出 + AI 后台缓存 + 相邻去重） ==========
+
+        /** 展示一条建议，记录到 currentDisplayedTip（供相邻去重） */
+        function displayTip(tip) {
             document.getElementById('tipTitle').textContent = tip.title;
             document.getElementById('tipContent').textContent = tip.content;
-        })();
+            currentDisplayedTip = { title: tip.title, content: tip.content };
+        }
 
-        let tipLoading = false;
+        /** 随机取一条预设建议（相邻去重：不重复当前显示的） */
+        function showPredefinedTip() {
+            const available = predefinedTips.filter(t =>
+                !currentDisplayedTip || t.title !== currentDisplayedTip.title
+            );
+            const pool = available.length > 0 ? available : predefinedTips;
+            displayTip(pool[Math.floor(Math.random() * pool.length)]);
+        }
 
-        async function loadStudyTip() {
-            if (tipLoading) return;
-            tipLoading = true;
-            const btn = document.getElementById('refreshTipBtn');
-            btn.disabled = true;
-            btn.textContent = '⏳ 获取中...';
-
+        /**
+         * 后台请求 AI 建议并缓存到 cachedTip
+         * 失败时静默处理，不影响已显示的内容
+         */
+        async function cacheAiTipInBackground() {
             try {
                 const res = await fetch('/api/report/studyTip?userId=' + currentUser.userId);
                 const data = await res.json();
                 if (data.code === 200 && data.data) {
-                    document.getElementById('tipTitle').textContent = data.data.title;
-                    document.getElementById('tipContent').textContent = data.data.content;
-                } else {
-                    // API 返回异常，随机取预设
-                    const tip = predefinedTips[Math.floor(Math.random() * predefinedTips.length)];
-                    document.getElementById('tipTitle').textContent = tip.title;
-                    document.getElementById('tipContent').textContent = tip.content;
+                    cachedTip = data.data;
                 }
             } catch (e) {
-                console.error('获取学习建议失败', e);
-                // 网络错误，随机取预设
-                const tip = predefinedTips[Math.floor(Math.random() * predefinedTips.length)];
-                document.getElementById('tipTitle').textContent = tip.title;
-                document.getElementById('tipContent').textContent = tip.content;
-            } finally {
-                tipLoading = false;
-                btn.disabled = false;
-                btn.textContent = '🔄 重新获取建议';
+                console.error('后台获取 AI 建议失败', e);
             }
+        }
+
+        /**
+         * 首次进入页面：
+         * 1. 立即显示一条预设建议（0 等待）
+         * 2. 后台请求 AI 建议并缓存
+         */
+        function preloadTip() {
+            showPredefinedTip();
+            cacheAiTipInBackground();
+        }
+
+        /**
+         * 点击"重新获取建议"：
+         * 1. 有缓存 → 立即展示，后台刷新一条新缓存
+         * 2. 无缓存（极边缘情况）→ 先展示预设，再后台请求
+         */
+        async function loadStudyTip() {
+            const btn = document.getElementById('refreshTipBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 刷新中...';
+
+            if (cachedTip) {
+                displayTip(cachedTip);
+                cachedTip = null;
+            } else {
+                showPredefinedTip();
+            }
+
+            await cacheAiTipInBackground();
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新获取建议';
         }
 
         async function loadPlanData() {
