@@ -3,14 +3,14 @@ package cn.edu.cuc.class10.dto;
 import java.util.List;
 
 public class TestQuestion {
-    private String questionId;
-    private String type;
-    private String wordId;
-    private String content;
-    private List<String> options;
-    private String correctAnswer;
-    private String partOfSpeech;  // 新增：词性中文
-    private String translation;   // 新增：释义
+    private String questionId;                  // 题目唯一ID（UUID）
+    private String type;                        // 题型：en2zh_choice / zh2en_choice / spelling
+    private String wordId;                      // 关联的单词ID
+    private String content;                     // 题目内容（英文或中文）
+    private List<String> options;               // 选项列表（选择题使用，拼写题为null）
+    private String correctAnswer;               // 正确答案
+    private String partOfSpeech;                // 词性中文（如"名词"、"动词"）
+    private String translation;                 // 中文释义
 
     public TestQuestion() {}
 

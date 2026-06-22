@@ -8,23 +8,22 @@ public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String userId;
+    private String userId;                    // 用户唯一ID（UUID）
 
     @Column(unique = true, nullable = false)
-    private String username;
+    private String username;                  // 用户名（唯一）
 
     @Column(nullable = false)
-    private String phase; // 'primary' | 'junior' | 'senior'
+    private String phase;                     // 学习阶段：primary（小学）| junior（初中）| senior（高中）| non-student
 
     @Column(nullable = false)
-    private String userType; // 'quiz' | 'memory'
+    private String userType;                  // 学习模式：quiz（刷题型）| memory（记忆型）
 
     @Column(nullable = false)
-    private String password;
+    private String password;                  // 登录密码（明文存储，简单项目）
 
-    // 学习计划相关字段
     @Column(name = "daily_goal")
-    private Integer dailyGoal = 10; // 每日学习目标单词数
+    private Integer dailyGoal = 10;           // 每日学习目标单词数（默认10个）
 
     public User() {
     }

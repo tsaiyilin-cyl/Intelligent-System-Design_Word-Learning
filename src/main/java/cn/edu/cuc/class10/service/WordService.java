@@ -36,6 +36,19 @@ public class WordService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * 添加单词
+     * 自建词（CUSTOM）必须指定 userId，且不能重复添加
+     * 考纲词（SYLLABUS）全局共享，无需 userId
+     *
+     * @param content     单词内容
+     * @param partOfSpeech 词性
+     * @param translation  中文释义
+     * @param phonetic    音标（可为空）
+     * @param wordType    单词类型（SYLLABUS / CUSTOM）
+     * @param userId      所属用户（仅 CUSTOM 时必需）
+     * @return 持久化后的 Word 对象
+     */
     public Word addWord(String content, String partOfSpeech, String translation,
                         String phonetic, WordType wordType, String userId) {
         if (wordType == WordType.CUSTOM) {
@@ -55,10 +68,16 @@ public class WordService {
         return wordRepository.save(newWord);
     }
 
+    /**
+     * 直接保存 Word 对象到数据库
+     */
     public Word saveWord(Word word) {
         return wordRepository.save(word);
     }
 
+    /**
+     * 更新单词扩展字段（短语、例句），仅自建词使用
+     */
     public void updateWordExtraFields(String wordId, String phrases, String sentences) {
         Optional<Word> wordOpt = wordRepository.findById(wordId);
 
@@ -79,6 +98,12 @@ public class WordService {
         wordRepository.save(word);
     }
 
+    /**
+     * 更新单词基本信息（内容、词性、释义、音标）
+     * 更改内容时会检查是否与已有单词重复
+     *
+     * @return 更新后的 Word 对象
+     */
     public Word updateWord(String wordId, String content, String partOfSpeech,
                            String translation, String phonetic) {
         Optional<Word> wordOpt = wordRepository.findById(wordId);
@@ -111,6 +136,9 @@ public class WordService {
         return wordRepository.save(word);
     }
 
+    /**
+     * 删除单词
+     */
     public void deleteWord(String wordId) {
         if (!wordRepository.existsById(wordId)) {
             throw new RuntimeException("单词不存在");
@@ -118,6 +146,9 @@ public class WordService {
         wordRepository.deleteById(wordId);
     }
 
+    /**
+     * 根据 ID 获取单词，不存在则抛出异常
+     */
     public Word getWordById(String wordId) {
         return wordRepository.findById(wordId)
                 .orElseThrow(() -> new RuntimeException("单词不存在"));
@@ -194,10 +225,16 @@ public class WordService {
         return union.isEmpty() ? 0 : (double) intersection.size() / union.size();
     }
 
+    /**
+     * 获取所有单词（不分用户类型和阶段）
+     */
     public List<Word> getAllWords() {
         return wordRepository.findAll();
     }
 
+    /**
+     * 获取所有单词（按内容字典序排列）
+     */
     public List<Word> getAllWordsOrderByContent() {
         return wordRepository.findAllOrderByContentAsc();
     }
@@ -213,16 +250,25 @@ public class WordService {
         return attachFamiliarityToWords(words, userId);
     }
 
+    /**
+     * 按单词类型获取（SYLLABUS / CUSTOM）
+     */
     public List<Word> getWordsByType(WordType wordType) {
         return wordRepository.findByWordType(wordType);
     }
 
+    /**
+     * 按学习阶段获取单词（小学/初中/高中）
+     */
     public List<Word> getWordsByPhase(String phase) {
         return wordRepository.findAll().stream()
                 .filter(w -> phase == null || phase.equals(w.getPhase()))
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 关键词搜索单词（匹配内容或释义）
+     */
     public List<Word> searchWords(String keyword) {
         return wordRepository.searchByKeyword(keyword);
     }
@@ -293,6 +339,9 @@ public class WordService {
         }).collect(Collectors.toList());
     }
 
+    /**
+     * 添加一个相似词义关联（将 targetWordId 以指定相似度添加到 wordId 的相似词义群中）
+     */
     public void addSimilarMeaning(String wordId, String targetWordId, Double similarityScore) {
         Word word = getWordById(wordId);
 
@@ -322,6 +371,9 @@ public class WordService {
         }
     }
 
+    /**
+     * 添加一个相似拼写关联（将 targetWordId 以指定编辑距离添加到 wordId 的相似拼写群中）
+     */
     public void addSimilarSpelling(String wordId, String targetWordId, Integer editDistance) {
         Word word = getWordById(wordId);
 
@@ -351,6 +403,10 @@ public class WordService {
         }
     }
 
+    /**
+     * 获取单词统计信息（总词数、考纲词数、自建词数）
+     * 自建词仅统计当前用户的（传 userId）
+     */
     public Map<String, Object> getWordStatistics(String userId) {
         List<Word> allWords = wordRepository.findAll();
 

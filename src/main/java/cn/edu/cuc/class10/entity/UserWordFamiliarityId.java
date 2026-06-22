@@ -1,11 +1,14 @@
 package cn.edu.cuc.class10.entity;
-//复合主键
+
 import java.io.Serializable;
 import java.util.Objects;
 
+/**
+ * UserWordFamiliarity 的复合主键类（userId + wordId 联合主键）
+ */
 public class UserWordFamiliarityId implements Serializable {
-    private String userId;
-    private String wordId;
+    private String userId;   // 用户ID
+    private String wordId;   // 单词ID
 
     public UserWordFamiliarityId() {}
     public UserWordFamiliarityId(String userId, String wordId) {

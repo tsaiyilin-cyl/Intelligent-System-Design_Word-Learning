@@ -1,16 +1,35 @@
-2026-06-16 09:46:50,388 [INFO] __main__: ∆Ù∂Ø Flask AI ∑˛ŒÒ: 0.0.0.0:5000 (debug=True)
+2026-06-22 20:04:22,141 [INFO] __main__: ∆Ù∂Ø Flask AI ∑˛ŒÒ: 0.0.0.0:5000 (debug=True)
  * Serving Flask app 'app'
  * Debug mode: on
-2026-06-16 09:46:50,433 [INFO] werkzeug: [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+2026-06-22 20:04:22,267 [INFO] werkzeug: [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on all addresses (0.0.0.0)
  * Running on http://127.0.0.1:5000
- * Running on http://10.203.7.81:5000
-2026-06-16 09:46:50,433 [INFO] werkzeug: [33mPress CTRL+C to quit[0m
-2026-06-16 09:46:50,744 [INFO] werkzeug: 127.0.0.1 - - [16/Jun/2026 09:46:50] "GET /api/health HTTP/1.1" 200 -
-2026-06-16 09:46:53,395 [INFO] services.study_tip: ø™ º‘§»» LLM API...
-2026-06-16 09:46:59,417 [INFO] services.study_tip: LLM API ≥…π¶∑µªÿΩ®“È: πÆπÃ‘ˆ¡øΩ·∫œ
-2026-06-16 09:46:59,418 [INFO] services.study_tip: LLM API ‘§»»≥…π¶: πÆπÃ‘ˆ¡øΩ·∫œ
-2026-06-16 09:47:28,422 [INFO] werkzeug: 127.0.0.1 - - [16/Jun/2026 09:47:28] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-16 09:47:28,458 [INFO] werkzeug: 127.0.0.1 - - [16/Jun/2026 09:47:28] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-16 09:47:28,464 [INFO] werkzeug: 127.0.0.1 - - [16/Jun/2026 09:47:28] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-16 09:47:28,470 [INFO] werkzeug: 127.0.0.1 - - [16/Jun/2026 09:47:28] "GET /api/ocr/status HTTP/1.1" 200 -
+ * Running on http://192.168.1.12:5000
+2026-06-22 20:04:22,267 [INFO] werkzeug: [33mPress CTRL+C to quit[0m
+2026-06-22 20:04:25,156 [INFO] services.study_tip: ø™ º‘§»» LLM API...
+2026-06-22 20:04:25,407 [INFO] werkzeug: 127.0.0.1 - - [22/Jun/2026 20:04:25] "GET /api/ocr/status HTTP/1.1" 200 -
+2026-06-22 20:04:25,445 [INFO] werkzeug: 127.0.0.1 - - [22/Jun/2026 20:04:25] "GET /api/ocr/status HTTP/1.1" 200 -
+2026-06-22 20:04:25,449 [INFO] werkzeug: 127.0.0.1 - - [22/Jun/2026 20:04:25] "GET /api/ocr/status HTTP/1.1" 200 -
+2026-06-22 20:04:25,455 [INFO] werkzeug: 127.0.0.1 - - [22/Jun/2026 20:04:25] "GET /api/ocr/status HTTP/1.1" 200 -
+2026-06-22 20:04:28,096 [INFO] werkzeug: 127.0.0.1 - - [22/Jun/2026 20:04:28] "GET /api/ocr/status HTTP/1.1" 200 -
+2026-06-22 20:04:28,101 [INFO] werkzeug: 127.0.0.1 - - [22/Jun/2026 20:04:28] "GET /api/ocr/status HTTP/1.1" 200 -
+2026-06-22 20:04:28,105 [INFO] werkzeug: 127.0.0.1 - - [22/Jun/2026 20:04:28] "GET /api/ocr/status HTTP/1.1" 200 -
+2026-06-22 20:04:28,110 [INFO] werkzeug: 127.0.0.1 - - [22/Jun/2026 20:04:28] "GET /api/ocr/status HTTP/1.1" 200 -
+2026-06-22 20:04:30,243 [ERROR] services.study_tip: LLM œÏ”¶Ω‚Œˆ ß∞‹: Expecting value: line 1 column 10 (char 9)
+2026-06-22 20:04:30,244 [WARNING] services.study_tip: LLM API ‘§»» ß∞‹£®≤ª”∞œÏ∑˛ŒÒ£¨∫Û–¯«Î«Ûª·◊‘∂Ø÷ÿ ‘£©
+2026-06-22 20:04:35,382 [INFO] werkzeug: 127.0.0.1 - - [22/Jun/2026 20:04:35] "GET /api/ocr/status HTTP/1.1" 200 -
+2026-06-22 20:04:35,393 [INFO] __main__:  ’µΩÕº∆¨ ∂±«Î«Û: 132893 bytes
+C:\Users\lenovo\AppData\Roaming\Python\Python39\site-packages\torch\nn\modules\module.py:1520: UserWarning: 1Torch was not compiled with flash attention. (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\builder\windows\pytorch\aten\src\ATen\native\transformers\cuda\sdp_utils.cpp:263.)
+  return forward_call(*args, **kwargs)
+2026-06-22 20:04:36,568 [INFO] werkzeug: 127.0.0.1 - - [22/Jun/2026 20:04:36] "POST /api/ocr/recognize HTTP/1.1" 200 -
+2026-06-22 20:04:48,861 [INFO] werkzeug: 127.0.0.1 - - [22/Jun/2026 20:04:48] "GET /api/ocr/status HTTP/1.1" 200 -
+2026-06-22 20:04:48,866 [INFO] werkzeug: 127.0.0.1 - - [22/Jun/2026 20:04:48] "GET /api/ocr/status HTTP/1.1" 200 -
+2026-06-22 20:04:48,871 [INFO] werkzeug: 127.0.0.1 - - [22/Jun/2026 20:04:48] "GET /api/ocr/status HTTP/1.1" 200 -
+2026-06-22 20:04:48,874 [INFO] werkzeug: 127.0.0.1 - - [22/Jun/2026 20:04:48] "GET /api/ocr/status HTTP/1.1" 200 -
+2026-06-22 20:04:53,147 [INFO] __main__:  ’µΩ—ßœ∞Ω®“È«Î«Û: userId=c55877a6-981f-454d-bd53-883b8e87cc4c
+2026-06-22 20:04:58,622 [INFO] services.study_tip: LLM API ≥…π¶∑µªÿΩ®“È: ∫ª µª˘¥°∏¥œ∞
+2026-06-22 20:04:58,623 [INFO] werkzeug: 127.0.0.1 - - [22/Jun/2026 20:04:58] "POST /api/study-tip HTTP/1.1" 200 -
+2026-06-22 20:07:33,894 [INFO] __main__:  ’µΩ—ßœ∞Ω®“È«Î«Û: userId=c55877a6-981f-454d-bd53-883b8e87cc4c
+2026-06-22 20:07:37,867 [ERROR] services.study_tip: LLM œÏ”¶Ω‚Œˆ ß∞‹: Unterminated string starting at: line 1 column 32 (char 31)
+2026-06-22 20:07:37,867 [INFO] services.study_tip:  π”√ª∫¥Êµƒ AI Ω®“È
+2026-06-22 20:07:37,868 [INFO] werkzeug: 127.0.0.1 - - [22/Jun/2026 20:07:37] "POST /api/study-tip HTTP/1.1" 200 -

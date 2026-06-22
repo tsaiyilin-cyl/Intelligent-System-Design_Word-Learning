@@ -8,16 +8,16 @@ import jakarta.persistence.*;
 public class UserWordFamiliarity {
 
     @Id
-    private String userId;
+    private String userId;                    // 用户ID（复合主键之一）
 
     @Id
-    private String wordId;
+    private String wordId;                    // 单词ID（复合主键之一）
 
     @Column(nullable = false)
-    private Integer familiarity;  // 0~100
+    private Integer familiarity;              // 熟悉度（0~230，越高越熟悉，初始50，可叠加时间衰减）
 
     @Column(nullable = false)
-    private Long lastUpdate;
+    private Long lastUpdate;                  // 上次更新熟悉度的时间（毫秒时间戳，用于衰减计算）
 
     // constructors, getters, setters
     public UserWordFamiliarity() {}

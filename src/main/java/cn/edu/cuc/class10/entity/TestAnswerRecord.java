@@ -12,34 +12,34 @@ public class TestAnswerRecord {
 
     @Id
     @Column(name = "record_id", length = 36)
-    private String recordId;
+    private String recordId;                  // 答题记录唯一ID（UUID）
 
     @Column(name = "session_id", nullable = false, length = 36)
-    private String sessionId;  // 关联 test_sessions 表
+    private String sessionId;                 // 关联的测试会话ID（外键→test_sessions）
 
     @Column(name = "question_index", nullable = false)
-    private Integer questionIndex;  // 题目序号（从0开始）
+    private Integer questionIndex;            // 题目序号（从0开始）
 
     @Column(name = "word_id", length = 36)
-    private String wordId;  // 单词ID
+    private String wordId;                    // 单词ID
 
     @Column(name = "question_type", length = 50)
-    private String questionType;  // en2zh_choice, zh2en_choice, spelling
+    private String questionType;              // 题型：en2zh_choice / zh2en_choice / spelling
 
     @Column(name = "question_content", columnDefinition = "TEXT")
-    private String questionContent;  // 题目内容
+    private String questionContent;           // 题目内容
 
     @Column(name = "correct_answer", columnDefinition = "TEXT")
-    private String correctAnswer;  // 正确答案
+    private String correctAnswer;             // 正确答案
 
     @Column(name = "user_answer", columnDefinition = "TEXT")
-    private String userAnswer;  // 用户答案
+    private String userAnswer;                // 用户答案
 
     @Column(name = "is_correct", nullable = false)
-    private Boolean isCorrect;  // 是否正确
+    private Boolean isCorrect;                // 是否正确
 
     @Column(name = "options_json", columnDefinition = "TEXT")
-    private String optionsJson;  // 选项列表（JSON格式，选择题使用）
+    private String optionsJson;               // 选项列表（JSON格式，选择题使用）
 
     public TestAnswerRecord() {
     }

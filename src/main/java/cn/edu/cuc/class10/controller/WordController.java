@@ -27,6 +27,13 @@ public class WordController {
     @Autowired
     private InteractionRepository interactionRepository;
 
+    /**
+     * 添加新单词（考纲词或自建词）
+     * GET /api/words/add
+     * 自建词（CUSTOM）需指定 userId，可附带短语/例句
+     *
+     * @return { code, message, data: Word }
+     */
     @GetMapping("/add")
     public Map<String, Object> addWord(
             @RequestParam String content,
@@ -70,6 +77,11 @@ public class WordController {
         return result;
     }
 
+    /**
+     * 更新单词基本信息（内容、词性、释义、音标）
+     * 若释义变化则会触发相似词义重算
+     * GET /api/words/update
+     */
     @GetMapping("/update")
     public Map<String, Object> updateWord(
             @RequestParam String wordId,
@@ -102,6 +114,10 @@ public class WordController {
         return result;
     }
 
+    /**
+     * 更新单词扩展字段（短语、例句），仅自建词使用
+     * GET /api/words/updateExtra
+     */
     @GetMapping("/updateExtra")
     public Map<String, Object> updateWordExtra(
             @RequestParam String wordId,
@@ -123,6 +139,10 @@ public class WordController {
         return result;
     }
 
+    /**
+     * 删除单词
+     * GET /api/words/delete
+     */
     @GetMapping("/delete")
     public Map<String, Object> deleteWord(@RequestParam String wordId) {
         Map<String, Object> result = new HashMap<>();
@@ -139,6 +159,10 @@ public class WordController {
         return result;
     }
 
+    /**
+     * 获取单词详情（含释义、音标、短语、相似词等，可选传 userId 获取熟悉度）
+     * GET /api/words/get
+     */
     @GetMapping("/get")
     public Map<String, Object> getWord(
             @RequestParam String wordId,
@@ -174,6 +198,10 @@ public class WordController {
         return result;
     }
 
+    /**
+     * 获取全部单词（不分用户，返回 Word 列表）
+     * GET /api/words/all
+     */
     @GetMapping("/all")
     public Map<String, Object> getAllWords() {
         Map<String, Object> result = new HashMap<>();
@@ -186,6 +214,10 @@ public class WordController {
         return result;
     }
 
+    /**
+     * 获取全部单词（按字典序），可传 userId 附带熟悉度
+     * GET /api/words/all/ordered
+     */
     @GetMapping("/all/ordered")
     public Map<String, Object> getAllWordsOrdered(
             @RequestParam(required = false) String userId) {
@@ -199,6 +231,10 @@ public class WordController {
         return result;
     }
 
+    /**
+     * 按单词类型查询（SYLLABUS / CUSTOM）
+     * GET /api/words/byType
+     */
     @GetMapping("/byType")
     public Map<String, Object> getWordsByType(@RequestParam String wordType) {
         Map<String, Object> result = new HashMap<>();
@@ -221,6 +257,10 @@ public class WordController {
         return result;
     }
 
+    /**
+     * 搜索单词（按关键词匹配内容/释义），可选传 userId 附带熟悉度
+     * GET /api/words/search
+     */
     @GetMapping("/search")
     public Map<String, Object> searchWords(
             @RequestParam String keyword,
@@ -372,6 +412,10 @@ public class WordController {
         };
     }
 
+    /**
+     * 获取单词统计（总数、考纲词数、自建词数）
+     * GET /api/words/statistics
+     */
     @GetMapping("/statistics")
     public Map<String, Object> getStatistics(
             @RequestParam(required = false) String userId) {

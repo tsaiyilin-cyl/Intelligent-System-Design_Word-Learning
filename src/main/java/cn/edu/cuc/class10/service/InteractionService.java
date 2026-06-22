@@ -57,7 +57,8 @@ public class InteractionService {
     }
 
     /**
-     * 获取某个用户对某个单词的熟悉度
+     * 获取某个用户对某个单词的存储熟悉度（原始值，未经时间衰减）
+     * 默认返回 50（未学习过的单词）
      */
     public int getFamiliarity(String userId, String wordId) {
         return familiarityRepository.findByUserIdAndWordId(userId, wordId)

@@ -9,19 +9,19 @@ public class Interaction {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String interactionId;
+    private String interactionId;             // 交互记录唯一ID（UUID）
 
     @Column(nullable = false)
-    private String userId;
+    private String userId;                    // 用户ID
 
     @Column(nullable = false)
-    private String wordId;
+    private String wordId;                    // 单词ID
 
     @Column(nullable = false)
-    private String feedback;  // 'known' or 'unknown'
+    private String feedback;                  // 用户反馈：'known'（认识）或 'unknown'（不认识）
 
     @Column(nullable = false)
-    private Long timestamp;
+    private Long timestamp;                   // 交互发生时间（毫秒时间戳）
 
     // constructors, getters, setters
     public Interaction() {}

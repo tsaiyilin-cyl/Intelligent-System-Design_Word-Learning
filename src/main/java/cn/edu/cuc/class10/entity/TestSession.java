@@ -12,28 +12,28 @@ public class TestSession {
 
     @Id
     @Column(name = "session_id", length = 36)
-    private String sessionId;
+    private String sessionId;                 // 测试会话唯一ID（UUID）
 
     @Column(name = "user_id", nullable = false, length = 36)
-    private String userId;
+    private String userId;                    // 用户ID
 
     @Column(name = "question_type", length = 50)
-    private String questionType;  // en2zh_choice, zh2en_choice, spelling
+    private String questionType;              // 题型：en2zh_choice / zh2en_choice / spelling
 
     @Column(name = "total_questions", nullable = false)
-    private Integer totalQuestions;
+    private Integer totalQuestions;           // 总题数
 
     @Column(name = "correct_count", nullable = false)
-    private Integer correctCount;
+    private Integer correctCount;             // 正确题数
 
     @Column(name = "start_time", nullable = false)
-    private Long startTime;
+    private Long startTime;                   // 测试开始时间（毫秒时间戳）
 
     @Column(name = "end_time", nullable = false)
-    private Long endTime;
+    private Long endTime;                     // 测试结束时间（毫秒时间戳）
 
     @Column(name = "create_time")
-    private Long createTime;
+    private Long createTime;                  // 记录创建时间（毫秒时间戳）
 
     public TestSession() {
     }

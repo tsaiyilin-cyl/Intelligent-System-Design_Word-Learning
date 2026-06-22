@@ -18,6 +18,14 @@ public class TestController {
     @Autowired
     private TestService testService;
 
+    /**
+     * 生成测试题目
+     * POST /api/test/generate
+     * 根据用户阶段和用户类型加权选题（记忆型/刷题型），支持多种题型
+     *
+     * @param request { userId, count, questionType }
+     * @return 含 sessionId 和题目列表
+     */
     @PostMapping("/generate")
     public Map<String, Object> generate(@RequestBody GenerateTestRequest request) {
         Map<String, Object> result = new HashMap<>();
@@ -36,6 +44,13 @@ public class TestController {
         return result;
     }
 
+    /**
+     * 提交单题答案（交由 Service 记录交互并自动更新熟悉度）
+     * POST /api/test/submit
+     *
+     * @param request { userId, wordId, userAnswer, correctAnswer }
+     * @return { code, correct: true/false }
+     */
     @PostMapping("/submit")
     public Map<String, Object> submit(@RequestBody SubmitAnswerRequest request) {
         Map<String, Object> result = new HashMap<>();
@@ -55,6 +70,13 @@ public class TestController {
         return result;
     }
 
+    /**
+     * 保存整个测试结果（生成 TestSession 记录）
+     * POST /api/test/saveResult
+     *
+     * @param payload { userId, questionType, totalQuestions, correctCount, startTime, endTime, sessionId }
+     * @return { code, sessionId }
+     */
     @PostMapping("/saveResult")
     public Map<String, Object> saveResult(@RequestBody Map<String, Object> payload) {
         Map<String, Object> result = new HashMap<>();
@@ -85,6 +107,10 @@ public class TestController {
         return result;
     }
 
+    /**
+     * 获取测试会话详情（含每道题的答题记录）
+     * GET /api/test/detail/{sessionId}
+     */
     @GetMapping("/detail/{sessionId}")
     public Map<String, Object> getDetail(@PathVariable String sessionId) {
         Map<String, Object> result = new HashMap<>();
@@ -99,6 +125,12 @@ public class TestController {
         return result;
     }
 
+    /**
+     * 保存单道题的详细答题记录（用于后续回顾错题）
+     * POST /api/test/saveAnswerRecord
+     *
+     * @param payload { sessionId, questionIndex, wordId, questionType, ... }
+     */
     @PostMapping("/saveAnswerRecord")
     public Map<String, Object> saveAnswerRecord(@RequestBody Map<String, Object> payload) {
         Map<String, Object> result = new HashMap<>();

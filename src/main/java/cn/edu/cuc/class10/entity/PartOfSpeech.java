@@ -1,5 +1,8 @@
 package cn.edu.cuc.class10.entity;
 
+/**
+ * 词性枚举（附带中文显示名称）
+ */
 public enum PartOfSpeech {
     NOUN("名词"),
     VERB("动词"),

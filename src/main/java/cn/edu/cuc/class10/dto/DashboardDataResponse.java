@@ -4,10 +4,10 @@ import java.util.List;
 import java.util.Map;
 
 public class DashboardDataResponse {
-    private int totalWords;          // 用户总词汇数（考纲范围内+自建）
-    private int masteredWords;       // 掌握单词数（衰减后有效熟悉度>=100）
-    private double averageAccuracy;  // 近7天平均正确率（百分比）
-    private List<DailyAccuracy> recentAccuracy; // 近7天每日正确率
+    private int totalWords;                     // 用户总词汇数（考纲范围内+自建）
+    private int masteredWords;                  // 掌握单词数（衰减后有效熟悉度>=100）
+    private double averageAccuracy;             // 近7天平均正确率（百分比）
+    private List<DailyAccuracy> recentAccuracy; // 近7天每日正确率列表
     private List<TestRecord> recentTests;       // 最近5次测试记录
     private List<MistakeWord> topMistakes;      // 易错词TOP5
 
@@ -31,8 +31,8 @@ public class DashboardDataResponse {
     public void setTopMistakes(List<MistakeWord> topMistakes) { this.topMistakes = topMistakes; }
 
     public static class DailyAccuracy {
-        private String date;   // 格式 yyyy-MM-dd
-        private double accuracy;
+        private String date;                    // 日期（格式 yyyy-MM-dd）
+        private double accuracy;                // 当日平均正确率（百分比）
 
         public String getDate() { return date; }
         public void setDate(String date) { this.date = date; }
@@ -42,12 +42,12 @@ public class DashboardDataResponse {
     }
 
     public static class TestRecord {
-        private String sessionId;
-        private String questionType;
-        private int total;
-        private int correct;
-        private double accuracy;
-        private long endTime;
+        private String sessionId;               // 测试会话ID
+        private String questionType;            // 题型（en2zh_choice / zh2en_choice / spelling）
+        private int total;                      // 总题数
+        private int correct;                    // 正确数
+        private double accuracy;                // 正确率（百分比）
+        private long endTime;                   // 完成时间（毫秒时间戳）
 
         public String getSessionId() { return sessionId; }
         public void setSessionId(String sessionId) { this.sessionId = sessionId; }
@@ -69,9 +69,9 @@ public class DashboardDataResponse {
     }
 
     public static class MistakeWord {
-        private String wordId;
-        private String wordContent;
-        private int mistakeCount;
+        private String wordId;                  // 单词ID
+        private String wordContent;             // 单词内容（英文）
+        private int mistakeCount;               // 出错次数
 
         public String getWordId() { return wordId; }
         public void setWordId(String wordId) { this.wordId = wordId; }

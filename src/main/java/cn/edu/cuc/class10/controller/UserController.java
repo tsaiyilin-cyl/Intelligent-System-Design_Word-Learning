@@ -71,11 +71,15 @@ public class UserController {
         return result;
     }
 
+    /**
+     * 用户登出接口
+     * GET /api/logout
+     */
     @GetMapping("/logout")
     public Map<String, Object> logout(@RequestParam String username) {
         Map<String, Object> result = new HashMap<>();
-        
-        // 调用Service层处理业务逻辑
+
+        // 调用Service层处理登出逻辑
         String message = userService.logout(username);
         
         result.put("code", 200);

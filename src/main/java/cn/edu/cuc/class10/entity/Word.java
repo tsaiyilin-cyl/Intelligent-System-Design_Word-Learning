@@ -8,44 +8,44 @@ public class Word {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String wordId;
+    private String wordId;                    // 单词唯一ID（UUID）
 
     @Column(nullable = false, length = 100)
-    private String content;
+    private String content;                   // 单词内容（英文，如 "frog"）
 
     @Column(length = 100)
-    private String partOfSpeech;
+    private String partOfSpeech;              // 词性（NOUN / VERB / ADJECTIVE 等）
 
     @Column(nullable = false, length = 1000)
-    private String translation;
+    private String translation;               // 中文释义
 
     @Column(length = 100)
-    private String phonetic;
+    private String phonetic;                  // 音标（如 ˈfrɒɡ）
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private WordType wordType;
+    private WordType wordType;                // 单词类型：SYLLABUS（考纲词）/ CUSTOM（自建词）
 
     @Column(length = 20)
-    private String phase;
+    private String phase;                     // 所属学段：primary / junior / senior
 
     @Column(length = 50)
-    private String userId; // 自建词汇的所属用户ID，考纲词为null
+    private String userId;                    // 自建词汇的所属用户ID，考纲词为null
 
     @Column(length = 2000)
-    private String similarMeanings;
+    private String similarMeanings;           // 相似词义群（JSON数组，存储word_id和相似度）
 
     @Column(length = 2000)
-    private String similarSpellings;
+    private String similarSpellings;          // 相似拼写群（JSON数组，存储word_id和编辑距离）
 
     @Column(columnDefinition = "TEXT")
-    private String extraAttributes;
+    private String extraAttributes;           // 额外属性（保留字段，暂未使用）
 
     @Column(columnDefinition = "TEXT")
-    private String phrases;
+    private String phrases;                   // 常用短语（自建词使用）
 
     @Column(columnDefinition = "TEXT")
-    private String sentences;
+    private String sentences;                 // 例句（自建词使用）
 
     public Word() {
     }

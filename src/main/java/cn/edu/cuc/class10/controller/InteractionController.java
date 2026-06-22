@@ -14,6 +14,13 @@ public class InteractionController {
     @Autowired
     private InteractionService interactionService;
 
+    /**
+     * 记录用户对单词的学习交互（熟悉/不熟悉），并更新熟悉度
+     * POST /api/interaction/record
+     *
+     * @param payload 请求体，含 userId / wordId / feedback（known 或 unknown）
+     * @return { code, message }
+     */
     @PostMapping("/record")
     public Map<String, Object> recordInteraction(@RequestBody Map<String, String> payload) {
         String userId = payload.get("userId");

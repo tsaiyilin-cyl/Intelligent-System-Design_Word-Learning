@@ -56,6 +56,12 @@ public class ReportService {
 
     private final Random random = new Random();
 
+    /**
+     * 获取仪表盘聚合数据
+     * 包含：总词数、掌握词数、近7天正确率趋势、最近5次测试记录、易错词TOP5
+     * 熟悉度经过艾宾浩斯时间衰减后计算
+     * 可访问词范围：考纲词（按阶段匹配） + 当前用户的自建词
+     */
     public DashboardDataResponse getDashboardData(String userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("用户不存在"));
@@ -350,6 +356,9 @@ public class ReportService {
         return PREDEFINED_TIPS.get(random.nextInt(PREDEFINED_TIPS.size()));
     }
 
+    /**
+     * 计算连续打卡天数（基于交互记录日期，支持断签后归零）
+     */
     private int calculateStreak(List<Interaction> interactions) {
         if (interactions.isEmpty()) return 0;
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");

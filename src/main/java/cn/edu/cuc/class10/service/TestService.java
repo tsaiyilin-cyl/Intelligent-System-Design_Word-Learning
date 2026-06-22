@@ -47,6 +47,16 @@ public class TestService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private Random random = new Random();
+    /**
+     * 为用户生成测试题目
+     * 根据用户的学习阶段筛选候选词，按用户类型（记忆型/刷题型）加权选题，
+     * 支持英译中选择、中译英选择、拼写三种题型
+     *
+     * @param userId 用户ID
+     * @param count  题目数量
+     * @param type   题型（en2zh / zh2en / spelling，空则随机）
+     * @return 含 sessionId 和题目列表的 Map
+     */
     @Transactional
     public Map<String, Object> generateQuestions(String userId, int count, String type) {
         User user = userRepository.findById(userId)
@@ -119,6 +129,10 @@ public class TestService {
         return result;
     }
 
+    /**
+     * 获取用户可访问的候选词列表
+     * 考纲词按阶段匹配，自建词仅限当前用户
+     */
     private List<Word> getCandidateWords(User user) {
         List<Word> allWords = wordRepository.findAll();
         String userPhase = user.getPhase();
@@ -129,6 +143,9 @@ public class TestService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 判断单词阶段是否在用户阶段范围内（小学≤小学，初中≤初中，高中全覆盖，非学生无）
+     */
     private boolean isPhaseMatch(String wordPhase, String userPhase) {
         if (wordPhase == null) return true;
         switch (userPhase) {
@@ -140,6 +157,12 @@ public class TestService {
         }
     }
 
+    /**
+     * 根据单词和题型构建一道题目（含正确的干扰项）
+     * en2zh_choice: 给出英文，选中文释义，从形似词群取干扰项
+     * zh2en_choice: 给出中文，选英文拼写，从近义词群取干扰项
+     * spelling: 给出中文，拼写英文
+     */
     private TestQuestion buildQuestion(Word word, String type) {
         TestQuestion q = new TestQuestion();
         q.setQuestionId(UUID.randomUUID().toString());
@@ -181,6 +204,9 @@ public class TestService {
         return q;
     }
 
+    /**
+     * 将前端传入的题型缩写映射为后端完整题型名称
+     */
     private String mapQuestionType(String frontendType) {
         switch (frontendType) {
             case "en2zh": return "en2zh_choice";
@@ -190,11 +216,17 @@ public class TestService {
         }
     }
 
+    /**
+     * 随机返回一种题型
+     */
     private String randomType() {
         String[] types = {"en2zh_choice", "zh2en_choice", "spelling"};
         return types[random.nextInt(types.length)];
     }
 
+    /**
+     * 按权重随机选取一个单词（权重越高越可能被选中）
+     */
     private Word weightedRandom(List<WordWeight> list) {
         double totalWeight = list.stream().mapToDouble(ww -> ww.weight).sum();
         double rand = random.nextDouble() * totalWeight;
@@ -322,6 +354,13 @@ public class TestService {
         return map.getOrDefault(posCode, posCode);
     }
 
+    /**
+     * 提交答案并记录交互
+     * 答对 → 记录 "known" 交互，熟悉度上升
+     * 答错 → 记录 "unknown" 交互，熟悉度下降，自动加入生词本
+     *
+     * @return true 回答正确 / false 回答错误
+     */
     public boolean submitAnswer(String userId, String wordId, String userAnswer, String correctAnswer) {
         boolean isCorrect = correctAnswer.equalsIgnoreCase(userAnswer.trim());
         String feedback = isCorrect ? "known" : "unknown";

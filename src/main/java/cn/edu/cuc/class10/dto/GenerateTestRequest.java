@@ -1,9 +1,9 @@
 package cn.edu.cuc.class10.dto;
 
 public class GenerateTestRequest {
-    private String userId;
-    private int count;
-    private String questionType;  // 新增: "en2zh", "zh2en", "spelling"
+    private String userId;                      // 用户ID
+    private int count;                          // 题目数量
+    private String questionType;                // 题型：en2zh / zh2en / spelling
 
     public GenerateTestRequest() {}
 

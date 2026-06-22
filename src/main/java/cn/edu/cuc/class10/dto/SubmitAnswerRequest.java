@@ -4,11 +4,11 @@ package cn.edu.cuc.class10.dto;
  * 提交答案请求DTO（前端→后端）
  */
 public class SubmitAnswerRequest {
-    private String userId;
-    private String wordId;
-    private String userAnswer;
-    private String correctAnswer;
-    private long timestamp;
+    private String userId;                      // 用户ID
+    private String wordId;                      // 单词ID
+    private String userAnswer;                  // 用户答案
+    private String correctAnswer;               // 正确答案
+    private long timestamp;                     // 提交时间（毫秒时间戳）
 
     public SubmitAnswerRequest() {}
 

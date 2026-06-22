@@ -12,22 +12,22 @@ public class MistakeWord {
 
     @Id
     @Column(name = "record_id", length = 36)
-    private String recordId;
+    private String recordId;                  // 记录唯一ID（UUID）
 
     @Column(name = "user_id", nullable = false, length = 36)
-    private String userId;
+    private String userId;                    // 用户ID
 
     @Column(name = "word_id", nullable = false, length = 36)
-    private String wordId;
+    private String wordId;                    // 单词ID
 
     @Column(name = "create_time", nullable = false)
-    private Long createTime;
+    private Long createTime;                  // 加入生词本的时间（毫秒时间戳）
 
     @Column(name = "review_count", nullable = false)
-    private Integer reviewCount;  // 复习次数
+    private Integer reviewCount;              // 复习次数
 
     @Column(name = "last_review_time")
-    private Long lastReviewTime;  // 最后复习时间
+    private Long lastReviewTime;              // 最后复习时间（毫秒时间戳）
 
     public MistakeWord() {}
 
