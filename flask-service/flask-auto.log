@@ -1,0 +1,16 @@
+2026-06-16 09:46:50,388 [INFO] __main__: ∆Ù∂Ø Flask AI ∑˛ŒÒ: 0.0.0.0:5000 (debug=True)
+ * Serving Flask app 'app'
+ * Debug mode: on
+2026-06-16 09:46:50,433 [INFO] werkzeug: [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.203.7.81:5000
+2026-06-16 09:46:50,433 [INFO] werkzeug: [33mPress CTRL+C to quit[0m
+2026-06-16 09:46:50,744 [INFO] werkzeug: 127.0.0.1 - - [16/Jun/2026 09:46:50] "GET /api/health HTTP/1.1" 200 -
+2026-06-16 09:46:53,395 [INFO] services.study_tip: ø™ º‘§»» LLM API...
+2026-06-16 09:46:59,417 [INFO] services.study_tip: LLM API ≥…π¶∑µªÿΩ®“È: πÆπÃ‘ˆ¡øΩ·∫œ
+2026-06-16 09:46:59,418 [INFO] services.study_tip: LLM API ‘§»»≥…π¶: πÆπÃ‘ˆ¡øΩ·∫œ
+2026-06-16 09:47:28,422 [INFO] werkzeug: 127.0.0.1 - - [16/Jun/2026 09:47:28] "GET /api/ocr/status HTTP/1.1" 200 -
+2026-06-16 09:47:28,458 [INFO] werkzeug: 127.0.0.1 - - [16/Jun/2026 09:47:28] "GET /api/ocr/status HTTP/1.1" 200 -
+2026-06-16 09:47:28,464 [INFO] werkzeug: 127.0.0.1 - - [16/Jun/2026 09:47:28] "GET /api/ocr/status HTTP/1.1" 200 -
+2026-06-16 09:47:28,470 [INFO] werkzeug: 127.0.0.1 - - [16/Jun/2026 09:47:28] "GET /api/ocr/status HTTP/1.1" 200 -

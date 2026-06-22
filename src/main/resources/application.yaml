@@ -98,7 +98,12 @@ flask:
   base-url: "http://localhost:5000"
   # 请求超时（毫秒）
   connect-timeout: 5000
-  read-timeout: 10000
+  # 读超时（调用 LLM 时响应较慢，设为 30s）
+  read-timeout: 30000
+  # 自动启动 Flask 子进程（开发环境默认为 true，生产环境建议设为 false）
+  auto-start: true
+  # 等待 Flask 就绪的超时时间（毫秒）
+  start-timeout: 30000
 
 # ===== OCR 照片识词配置 =====
 ocr:

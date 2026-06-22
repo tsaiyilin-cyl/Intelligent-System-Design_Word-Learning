@@ -359,8 +359,8 @@
     <script>
         let currentUser = null;
         let currentWordListFilter = 'all';
-        let cachedTip = null;              // 预缓存的学习建议
-        let currentDisplayedTip = null;    // 当前显示的建议（用于相邻去重）
+        let refreshInFlight = false;       // 正在刷新中（防止并发）
+        let tipSeq = 0;                    // 递增序号，用于忽略过期回调
 
         // 页面加载时获取用户信息
         window.addEventListener('load', function() {
@@ -376,13 +376,8 @@
 
             // 从后端加载实时数据
             loadPlanData();
-            // 预加载学习建议（缓存结果，避免点击"重新获取"时等待）
+            // 预加载学习建议：预设秒出 + AI 到达后自动替换
             preloadTip();
-        });
-
-        // 切出页面时丢弃缓存（用户可能做了操作使数据变更）
-        window.addEventListener('beforeunload', function() {
-            cachedTip = null;
         });
 
         // 预设建议（API 失败时回退使用）
@@ -395,67 +390,83 @@
 
         // ========== 学习建议（预置秒出 + AI 后台缓存 + 相邻去重） ==========
 
-        /** 展示一条建议，记录到 currentDisplayedTip（供相邻去重） */
+        /** 展示一条建议 */
         function displayTip(tip) {
             document.getElementById('tipTitle').textContent = tip.title;
             document.getElementById('tipContent').textContent = tip.content;
-            currentDisplayedTip = { title: tip.title, content: tip.content };
         }
 
         /** 随机取一条预设建议（相邻去重：不重复当前显示的） */
         function showPredefinedTip() {
-            const available = predefinedTips.filter(t =>
-                !currentDisplayedTip || t.title !== currentDisplayedTip.title
-            );
+            const currentTitle = document.getElementById('tipTitle').textContent;
+            const available = predefinedTips.filter(t => t.title !== currentTitle);
             const pool = available.length > 0 ? available : predefinedTips;
             displayTip(pool[Math.floor(Math.random() * pool.length)]);
         }
 
         /**
-         * 后台请求 AI 建议并缓存到 cachedTip
-         * 失败时静默处理，不影响已显示的内容
+         * 请求 AI 建议。
+         * 返回 { title, content } 或 null（失败时）
          */
-        async function cacheAiTipInBackground() {
+        async function fetchAiTip() {
             try {
                 const res = await fetch('/api/report/studyTip?userId=' + currentUser.userId);
                 const data = await res.json();
-                if (data.code === 200 && data.data) {
-                    cachedTip = data.data;
+                if (data.code === 200 && data.data && data.data.title && data.data.content) {
+                    return { title: data.data.title, content: data.data.content };
                 }
             } catch (e) {
-                console.error('后台获取 AI 建议失败', e);
+                console.error('获取 AI 建议失败', e);
+            }
+            return null;
+        }
+
+        /**
+         * 在后台拉取 AI 建议，拉取成功后自动替换界面上的建议
+         * @param seq 此次拉取的序号，用于判断回调是否过期
+         */
+        async function refreshTipInBackground(seq) {
+            const tip = await fetchAiTip();
+            // 只有在没有新刷新、且回调未过期时才替换显示
+            if (!refreshInFlight && tip && seq === tipSeq) {
+                displayTip(tip);
             }
         }
 
         /**
          * 首次进入页面：
          * 1. 立即显示一条预设建议（0 等待）
-         * 2. 后台请求 AI 建议并缓存
+         * 2. 后台请求 AI 建议，到达后自动替换
          */
         function preloadTip() {
             showPredefinedTip();
-            cacheAiTipInBackground();
+            refreshTipInBackground(++tipSeq);
         }
 
         /**
          * 点击"重新获取建议"：
-         * 1. 有缓存 → 立即展示，后台刷新一条新缓存
-         * 2. 无缓存（极边缘情况）→ 先展示预设，再后台请求
+         * 1. 先展示预设兜底（绝不空转）
+         * 2. 请求 AI 建议，到达后自动替换
          */
         async function loadStudyTip() {
+            if (refreshInFlight) return;
+
             const btn = document.getElementById('refreshTipBtn');
             btn.disabled = true;
             btn.textContent = '⏳ 刷新中...';
+            refreshInFlight = true;
 
-            if (cachedTip) {
-                displayTip(cachedTip);
-                cachedTip = null;
-            } else {
-                showPredefinedTip();
+            // 立刻展示预设兜底，不等后端
+            showPredefinedTip();
+
+            // 后台请求 AI，到达后自动替换
+            const seq = ++tipSeq;
+            const tip = await fetchAiTip();
+            if (tip && seq === tipSeq) {
+                displayTip(tip);
             }
 
-            await cacheAiTipInBackground();
-
+            refreshInFlight = false;
             btn.disabled = false;
             btn.textContent = '🔄 重新获取建议';
         }

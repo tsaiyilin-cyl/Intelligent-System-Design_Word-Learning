@@ -15,6 +15,8 @@ public interface WordRepository extends JpaRepository<Word, String> {
 
     Optional<Word> findByContent(String content);
 
+    List<Word> findAllByContent(String content);
+
     boolean existsByContent(String content);
 
     boolean existsByContentAndUserIdAndWordType(String content, String userId, WordType wordType);

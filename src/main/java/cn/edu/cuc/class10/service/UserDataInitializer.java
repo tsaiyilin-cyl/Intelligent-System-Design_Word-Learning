@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
 import java.util.Random;
 
 /**
@@ -52,10 +51,6 @@ public class UserDataInitializer implements CommandLineRunner {
         admin.setPhase("senior");
         admin.setUserType("memory");
         admin.setDailyGoal(20);
-        admin.setTotalWords(0);
-        admin.setMasteredWords(0);
-        admin.setStudyStreak(0);
-        admin.setLastStudyDate(null);
         userRepository.save(admin);
         System.out.println("admin 用户创建完成 (admin / 123456)");
     }
@@ -93,15 +88,8 @@ public class UserDataInitializer implements CommandLineRunner {
             // 随机选择用户类型
             user.setUserType(userTypes[random.nextInt(userTypes.length)]);
             
-            // 设置学习计划相关字段
-            user.setDailyGoal(random.nextInt(20) + 5); // 5-25之间的随机值
-            user.setTotalWords(random.nextInt(500)); // 0-500之间的随机值
-            user.setMasteredWords(random.nextInt(user.getTotalWords())); // 小于总学习数
-            user.setStudyStreak(random.nextInt(30)); // 0-30天
-            
-            // 设置最后学习日期（最近30天内）
-            LocalDate lastStudyDate = LocalDate.now().minusDays(random.nextInt(30));
-            user.setLastStudyDate(lastStudyDate.toString());
+            // 设置每日学习目标（5-25之间的随机值）
+            user.setDailyGoal(random.nextInt(20) + 5);
             
             // 保存用户
             userRepository.save(user);

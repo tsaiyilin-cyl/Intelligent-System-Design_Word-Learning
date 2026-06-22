@@ -26,18 +26,6 @@ public class User {
     @Column(name = "daily_goal")
     private Integer dailyGoal = 10; // 每日学习目标单词数
 
-    @Column(name = "total_words")
-    private Integer totalWords = 0; // 已学习单词总数
-
-    @Column(name = "mastered_words")
-    private Integer masteredWords = 0; // 已掌握单词数
-
-    @Column(name = "study_streak")
-    private Integer studyStreak = 0; // 连续学习天数
-
-    @Column(name = "last_study_date")
-    private String lastStudyDate; // 最后学习日期
-
     public User() {
     }
 
@@ -94,37 +82,5 @@ public class User {
 
     public void setDailyGoal(Integer dailyGoal) {
         this.dailyGoal = dailyGoal;
-    }
-
-    public Integer getTotalWords() {
-        return totalWords;
-    }
-
-    public void setTotalWords(Integer totalWords) {
-        this.totalWords = totalWords;
-    }
-
-    public Integer getMasteredWords() {
-        return masteredWords;
-    }
-
-    public void setMasteredWords(Integer masteredWords) {
-        this.masteredWords = masteredWords;
-    }
-
-    public Integer getStudyStreak() {
-        return studyStreak;
-    }
-
-    public void setStudyStreak(Integer studyStreak) {
-        this.studyStreak = studyStreak;
-    }
-
-    public String getLastStudyDate() {
-        return lastStudyDate;
-    }
-
-    public void setLastStudyDate(String lastStudyDate) {
-        this.lastStudyDate = lastStudyDate;
     }
 }

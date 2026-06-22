@@ -1,0 +1,12 @@
+2026-06-12 21:12:58,403 [INFO] __main__: Æô¶¯ Flask AI ·þÎñ: 0.0.0.0:5000 (debug=True)
+ * Serving Flask app 'app'
+ * Debug mode: on
+2026-06-12 21:12:58,432 [INFO] werkzeug: [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.0.83:5000
+2026-06-12 21:12:58,433 [INFO] werkzeug: [33mPress CTRL+C to quit[0m
+2026-06-12 21:12:58,448 [INFO] werkzeug:  * Restarting with watchdog (windowsapi)
+2026-06-12 21:13:04,869 [INFO] __main__: Æô¶¯ Flask AI ·þÎñ: 0.0.0.0:5000 (debug=True)
+2026-06-12 21:13:04,884 [WARNING] werkzeug:  * Debugger is active!
+2026-06-12 21:13:04,897 [INFO] werkzeug:  * Debugger PIN: 976-282-910

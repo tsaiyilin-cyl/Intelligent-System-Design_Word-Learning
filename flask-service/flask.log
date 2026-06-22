@@ -1,58 +1,12 @@
-2026-06-11 23:46:59,756 [INFO] __main__: ∆Ù∂Ø Flask AI ∑˛ŒÒ: 0.0.0.0:5000 (debug=True)
+2026-06-12 21:12:07,776 [INFO] __main__: ∆Ù∂Ø Flask AI ∑˛ŒÒ: 0.0.0.0:5000 (debug=True)
  * Serving Flask app 'app'
  * Debug mode: on
-2026-06-11 23:46:59,785 [INFO] werkzeug: [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+2026-06-12 21:12:07,862 [INFO] werkzeug: [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on all addresses (0.0.0.0)
  * Running on http://127.0.0.1:5000
- * Running on http://192.168.1.12:5000
-2026-06-11 23:46:59,785 [INFO] werkzeug: [33mPress CTRL+C to quit[0m
-2026-06-11 23:46:59,798 [INFO] werkzeug:  * Restarting with watchdog (windowsapi)
-2026-06-11 23:47:06,376 [INFO] __main__: ∆Ù∂Ø Flask AI ∑˛ŒÒ: 0.0.0.0:5000 (debug=True)
-2026-06-11 23:47:06,391 [WARNING] werkzeug:  * Debugger is active!
-2026-06-11 23:47:06,405 [INFO] werkzeug:  * Debugger PIN: 127-899-933
-2026-06-11 23:47:06,557 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:47:06] "GET /api/health HTTP/1.1" 200 -
-2026-06-11 23:47:09,577 [INFO] __main__:  ’µΩ—ßœ∞Ω®“È«Î«Û: userId=test
-2026-06-11 23:47:15,653 [INFO] services.study_tip: LLM API ≥…π¶∑µªÿΩ®“È: ΩÒ»’≤π¥ º∆ªÆ
-2026-06-11 23:47:15,654 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:47:15] "POST /api/study-tip HTTP/1.1" 200 -
-2026-06-11 23:48:35,169 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:48:35] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-11 23:48:35,201 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:48:35] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-11 23:48:35,206 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:48:35] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-11 23:48:35,211 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:48:35] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-11 23:48:41,650 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:48:41] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-11 23:48:41,654 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:48:41] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-11 23:48:41,659 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:48:41] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-11 23:48:41,663 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:48:41] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-11 23:48:43,769 [INFO] __main__:  ’µΩ—ßœ∞Ω®“È«Î«Û: userId=c55877a6-981f-454d-bd53-883b8e87cc4c
-2026-06-11 23:48:47,924 [INFO] services.study_tip: LLM API ≥…π¶∑µªÿΩ®“È: º”«ø∏¥œ∞πÆπÃ
-2026-06-11 23:48:47,924 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:48:47] "POST /api/study-tip HTTP/1.1" 200 -
-2026-06-11 23:55:50,569 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:55:50] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-11 23:55:50,603 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:55:50] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-11 23:55:50,609 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:55:50] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-11 23:55:50,613 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:55:50] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-11 23:55:54,434 [INFO] __main__:  ’µΩ—ßœ∞Ω®“È«Î«Û: userId=c55877a6-981f-454d-bd53-883b8e87cc4c
-2026-06-11 23:55:59,419 [INFO] services.study_tip: LLM API ≥…π¶∑µªÿΩ®“È: πÆπÃª˘¥°¥ ª„
-2026-06-11 23:55:59,420 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:55:59] "POST /api/study-tip HTTP/1.1" 200 -
-2026-06-11 23:56:29,453 [INFO] __main__:  ’µΩ—ßœ∞Ω®“È«Î«Û: userId=c55877a6-981f-454d-bd53-883b8e87cc4c
-2026-06-11 23:56:33,699 [INFO] services.study_tip: LLM API ≥…π¶∑µªÿΩ®“È: πÆπÃª˘¥°¥ ª„
-2026-06-11 23:56:33,699 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:56:33] "POST /api/study-tip HTTP/1.1" 200 -
-2026-06-11 23:56:37,766 [INFO] __main__:  ’µΩ—ßœ∞Ω®“È«Î«Û: userId=c55877a6-981f-454d-bd53-883b8e87cc4c
-2026-06-11 23:56:42,249 [INFO] services.study_tip: LLM API ≥…π¶∑µªÿΩ®“È: πÆπÃ“—”–¥ ª„
-2026-06-11 23:56:42,250 [INFO] werkzeug: 127.0.0.1 - - [11/Jun/2026 23:56:42] "POST /api/study-tip HTTP/1.1" 200 -
-2026-06-12 00:10:06,459 [INFO] werkzeug: 127.0.0.1 - - [12/Jun/2026 00:10:06] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-12 00:10:06,495 [INFO] werkzeug: 127.0.0.1 - - [12/Jun/2026 00:10:06] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-12 00:10:06,501 [INFO] werkzeug: 127.0.0.1 - - [12/Jun/2026 00:10:06] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-12 00:10:06,507 [INFO] werkzeug: 127.0.0.1 - - [12/Jun/2026 00:10:06] "GET /api/ocr/status HTTP/1.1" 200 -
-2026-06-12 00:10:11,132 [INFO] __main__:  ’µΩ—ßœ∞Ω®“È«Î«Û: userId=c55877a6-981f-454d-bd53-883b8e87cc4c
-2026-06-12 00:10:15,661 [ERROR] services.study_tip: LLM œÏ”¶Ω‚Œˆ ß∞‹: Unterminated string starting at: line 1 column 11 (char 10)
-2026-06-12 00:10:15,662 [INFO] services.study_tip: LLM API ≤ªø…”√£¨ π”√‘§…ËΩ®“È
-2026-06-12 00:10:15,662 [INFO] werkzeug: 127.0.0.1 - - [12/Jun/2026 00:10:15] "POST /api/study-tip HTTP/1.1" 200 -
-2026-06-12 00:10:36,886 [INFO] __main__:  ’µΩ—ßœ∞Ω®“È«Î«Û: userId=c55877a6-981f-454d-bd53-883b8e87cc4c
-2026-06-12 00:10:41,998 [INFO] services.study_tip: LLM API ≥…π¶∑µªÿΩ®“È: πÆπÃª˘¥°
-2026-06-12 00:10:41,998 [INFO] werkzeug: 127.0.0.1 - - [12/Jun/2026 00:10:41] "POST /api/study-tip HTTP/1.1" 200 -
-2026-06-12 00:10:46,001 [INFO] __main__:  ’µΩ—ßœ∞Ω®“È«Î«Û: userId=c55877a6-981f-454d-bd53-883b8e87cc4c
-2026-06-12 00:10:50,523 [INFO] services.study_tip: LLM API ≥…π¶∑µªÿΩ®“È: πÆπÃ“—”–¥ ª„
-2026-06-12 00:10:50,524 [INFO] werkzeug: 127.0.0.1 - - [12/Jun/2026 00:10:50] "POST /api/study-tip HTTP/1.1" 200 -
-2026-06-12 00:11:19,422 [INFO] __main__:  ’µΩ—ßœ∞Ω®“È«Î«Û: userId=c55877a6-981f-454d-bd53-883b8e87cc4c
-2026-06-12 00:11:25,253 [ERROR] services.study_tip: LLM œÏ”¶Ω‚Œˆ ß∞‹: Unterminated string starting at: line 1 column 32 (char 31)
-2026-06-12 00:11:25,253 [INFO] services.study_tip: LLM API ≤ªø…”√£¨ π”√‘§…ËΩ®“È
-2026-06-12 00:11:25,253 [INFO] werkzeug: 127.0.0.1 - - [12/Jun/2026 00:11:25] "POST /api/study-tip HTTP/1.1" 200 -
+ * Running on http://192.168.0.83:5000
+2026-06-12 21:12:07,862 [INFO] werkzeug: [33mPress CTRL+C to quit[0m
+2026-06-12 21:12:07,938 [INFO] werkzeug:  * Restarting with watchdog (windowsapi)
+2026-06-12 21:12:16,631 [INFO] __main__: ∆Ù∂Ø Flask AI ∑˛ŒÒ: 0.0.0.0:5000 (debug=True)
+2026-06-12 21:12:16,647 [WARNING] werkzeug:  * Debugger is active!
+2026-06-12 21:12:16,662 [INFO] werkzeug:  * Debugger PIN: 976-282-910

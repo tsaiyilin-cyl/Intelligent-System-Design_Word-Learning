@@ -1,6 +1,7 @@
 package cn.edu.cuc.class10.service;
 
 import cn.edu.cuc.class10.entity.Word;
+import cn.edu.cuc.class10.entity.WordType;
 import cn.edu.cuc.class10.repository.WordRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -118,10 +119,11 @@ public class OcrService {
      * 识别图片中的物体
      *
      * @param imageStream 图片输入流
+     * @param userId      当前用户 ID（用于隔离自建词库，null 则只匹配考纲词）
      * @return 识别结果列表（按置信度降序），已匹配数据库单词
      * @throws RuntimeException Flask 不可用或推理失败时抛出
      */
-    public List<RecognitionResult> recognize(InputStream imageStream) {
+    public List<RecognitionResult> recognize(InputStream imageStream, String userId) {
         try {
             // 1. 读取图片字节
             byte[] imageBytes = readBytes(imageStream);
@@ -149,7 +151,7 @@ public class OcrService {
                 result.setConfidence(confidence);
                 result.setDisplayName(displayName);
 
-                searchWordInDatabase(result, displayName);
+                searchWordInDatabase(result, displayName, userId);
 
                 results.add(result);
             }
@@ -218,20 +220,50 @@ public class OcrService {
 
     /**
      * 在 words 表中搜索与识别标签匹配的单词
-     * 匹配策略：精确匹配（case-insensitive）
+     * <p>
+     * 匹配规则（用户隔离）：
+     * 1. 考纲词（SYLLABUS）→ 所有用户共享，匹配即收录
+     * 2. 当前用户的自建词（CUSTOM + userId 匹配）→ 视为已收录
+     * 3. 其他用户的自建词 → 不匹配，允许当前用户添加为自己的自建词
+     *
+     * @param userId 当前用户 ID（传 null 时只匹配考纲词）
      */
-    private void searchWordInDatabase(RecognitionResult result, String displayName) {
+    private void searchWordInDatabase(RecognitionResult result, String displayName, String userId) {
         if (displayName == null || displayName.isEmpty()) {
             result.setMatched(false);
             return;
         }
 
-        Optional<Word> exactMatch = wordRepository.findByContent(displayName);
-        if (exactMatch.isPresent()) {
-            fillMatchedWord(result, exactMatch.get());
-        } else {
+        // 找出所有 content 精确匹配的词（可能有多个：考纲词 + 不同用户的自建词）
+        List<Word> matches = wordRepository.findAllByContent(displayName);
+        if (matches.isEmpty()) {
             result.setMatched(false);
+            return;
         }
+
+        // 优先匹配考纲词（全局共享）
+        Optional<Word> syllabus = matches.stream()
+                .filter(w -> w.getWordType() == WordType.SYLLABUS)
+                .findFirst();
+        if (syllabus.isPresent()) {
+            fillMatchedWord(result, syllabus.get());
+            return;
+        }
+
+        // 其次匹配当前用户的自建词
+        if (userId != null) {
+            Optional<Word> ownCustom = matches.stream()
+                    .filter(w -> w.getWordType() == WordType.CUSTOM
+                            && userId.equals(w.getUserId()))
+                    .findFirst();
+            if (ownCustom.isPresent()) {
+                fillMatchedWord(result, ownCustom.get());
+                return;
+            }
+        }
+
+        // 只有其他用户的自建词或完全不匹配 → 视为未收录
+        result.setMatched(false);
     }
 
     private void fillMatchedWord(RecognitionResult result, Word word) {

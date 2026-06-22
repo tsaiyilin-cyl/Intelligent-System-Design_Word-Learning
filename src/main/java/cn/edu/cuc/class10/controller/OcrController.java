@@ -69,8 +69,8 @@ public class OcrController {
             }
 
             // 执行识别
-            log.info("Recognizing image: {} ({} bytes)", file.getOriginalFilename(), file.getSize());
-            List<OcrService.RecognitionResult> candidates = ocrService.recognize(file.getInputStream());
+            log.info("Recognizing image: {} ({} bytes, userId={})", file.getOriginalFilename(), file.getSize(), userId);
+            List<OcrService.RecognitionResult> candidates = ocrService.recognize(file.getInputStream(), userId);
 
             // 构建响应
             List<Map<String, Object>> dataList = new ArrayList<>();

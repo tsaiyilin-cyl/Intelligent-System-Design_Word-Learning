@@ -7,11 +7,15 @@ import os
 import json
 import random
 import logging
+import threading
 from typing import Optional
 
 import requests
 
 logger = logging.getLogger(__name__)
+
+# 缓存：最近一次成功的 AI 建议（避免每次请求都调 LLM，也解决冷启动问题）
+_tip_cache = {"tip": None}
 
 # 预设建议（兜底）
 PREDEFINED_TIPS = [
@@ -59,7 +63,7 @@ def generate_study_tip(study_data: dict) -> dict:
             - todayLearned: 今日已学单词数
 
     Returns:
-        {"title": str, "content": str, "source": "ai"|"predefined"}
+        {"title": str, "content": str, "source": "ai"|"predefined"|"cached"}
     """
     phase = PHASE_MAP.get(study_data.get("phase"), study_data.get("phase", "未知"))
     user_type = TYPE_MAP.get(study_data.get("userType"), study_data.get("userType", "未知"))
@@ -68,11 +72,19 @@ def generate_study_tip(study_data: dict) -> dict:
     tip = _call_llm_api(phase, user_type, study_data)
 
     if tip is not None:
+        # 缓存成功的 AI 建议
+        _tip_cache["tip"] = (tip["title"], tip["content"])
         return {"title": tip["title"], "content": tip["content"], "source": "ai"}
 
-    # 失败时走预设兜底
+    # LLM 失败时，尝试用缓存兜底
+    cached = _tip_cache.get("tip")
+    if cached is not None:
+        logger.info("使用缓存的 AI 建议")
+        return {"title": cached[0], "content": cached[1], "source": "cached"}
+
+    # 最后走预设兜底
     fallback = random.choice(PREDEFINED_TIPS)
-    logger.info("LLM API 不可用，使用预设建议")
+    logger.info("LLM API 不可用且无缓存，使用预设建议")
     return {"title": fallback["title"], "content": fallback["content"], "source": "predefined"}
 
 
@@ -104,7 +116,7 @@ def _call_llm_api(phase: str, user_type: str, study_data: dict) -> Optional[dict
                 "temperature": float(os.getenv("LLM_TEMPERATURE", "0.8")),
                 "max_tokens": int(os.getenv("LLM_MAX_TOKENS", "120")),
             },
-            timeout=10,
+            timeout=30,
         )
         resp.raise_for_status()
         content = resp.json()["choices"][0]["message"]["content"]
@@ -128,6 +140,31 @@ def _call_llm_api(phase: str, user_type: str, study_data: dict) -> Optional[dict
         logger.error("LLM 响应解析失败: %s", e)
 
     return None
+
+
+def warmup_llm():
+    """在后台预热 LLM API（解决首次调用冷启动慢的问题），不影响服务启动"""
+    api_key = os.getenv("LLM_API_KEY", "")
+    if not api_key:
+        logger.info("LLM_API_KEY 未配置，跳过预热")
+        return
+
+    logger.info("开始预热 LLM API...")
+    dummy_data = {
+        "phase": "senior",
+        "userType": "quiz",
+        "dailyGoal": 20,
+        "totalWords": 100,
+        "masteredWords": 50,
+        "studyStreak": 5,
+        "todayLearned": 5,
+    }
+    tip = _call_llm_api("高中", "刷题型（偏好快速刷词）", dummy_data)
+    if tip is not None:
+        _tip_cache["tip"] = (tip["title"], tip["content"])
+        logger.info("LLM API 预热成功: %s", tip["title"])
+    else:
+        logger.warning("LLM API 预热失败（不影响服务，后续请求会自动重试）")
 
 
 def _build_prompt(phase: str, user_type: str, study_data: dict) -> str:

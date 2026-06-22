@@ -1,16 +1,14 @@
 """
 Flask AI 服务入口
----
-定位：项目的 AI 能力层，负责所有与大模型/机器学习相关的任务。
-Spring Boot 专注业务逻辑和数据，Flask 专注 AI 推理。
 """
 
 import os
 import logging
+import threading
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 
-from services.study_tip import generate_study_tip
+from services.study_tip import generate_study_tip, warmup_llm
 from services import ocr as ocr_service
 
 load_dotenv()
@@ -161,7 +159,13 @@ def ocr_recognize():
 if __name__ == "__main__":
     host = os.getenv("FLASK_HOST", "0.0.0.0")
     port = int(os.getenv("FLASK_PORT", "5000"))
-    debug = os.getenv("FLASK_DEBUG", "true").lower() == "true"
+    debug = os.getenv("FLASK_DEBUG", "false").lower() == "true"
 
     logger.info("启动 Flask AI 服务: %s:%d (debug=%s)", host, port, debug)
-    app.run(host=host, port=port, debug=debug)
+
+    # 后台预热 LLM API（解决首次调用冷启动慢的问题）
+    # 延迟 3 秒启动，等模型加载完成后再预热
+    threading.Timer(3.0, warmup_llm).start()
+
+    # 注意: use_reloader=False 防止 PyTorch 写 module.py 时触发 watchdog 重启
+    app.run(host=host, port=port, debug=debug, use_reloader=False)
